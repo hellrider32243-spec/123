@@ -59,6 +59,7 @@ def all_clients() -> list[dict]:
 
 LIMIT_IP = int(os.getenv("VPN_DEVICE_LIMIT_IP", os.getenv("VPN_MAX_DEVICES", "3")) or "3")
 # AMS Reality inbounds are managed by x-ui (limitIp enforcement). Standalone xray disabled.
+# TCP :443 goes nginx(stream)+proxy_protocol -> 127.0.0.1:10443 (acceptProxyProtocol=true).
 AMS_XUI_PORTS = (
     int(os.getenv("AMS_XRAY_PORT", "10443")),
     int(os.getenv("AMS_GRPC_PORT", "49713")),
