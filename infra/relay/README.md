@@ -77,3 +77,19 @@ VPN_PROFILE_AMS=🇳🇱 Нидерланды — 🚀 Чистый
 5. Fill `/opt/nordwings/relay/ams.params.json` from the example; run `sync_ams.py` once.
 6. Set the `AMS_*` env vars in both `.env` files and restart `nordwings-web`.
 7. Enable `ams-sync.timer` on the main server.
+
+
+## Subscription HTTPS proxy (why `ams.wingsvpn.shop`)
+
+`wingsvpn.shop` still resolves to the blocked origin IP on RU mobile
+(Cloudflare NS were never activated at the registrar — DNS stays on Porkbun),
+so Happ times out when fetching `https://wingsvpn.shop/miniapp/sub/...`.
+
+Fix: nginx on the relay does SNI-split on `:443`:
+
+- `ams.wingsvpn.shop` → local HTTPS (Let's Encrypt) → reverse-proxy to main
+  `172.86.68.87:8001/sub/` (iptables allowlist)
+- default / Reality SNI → Xray on `127.0.0.1:10443`
+
+Subscription and «Add to Happ» links must use
+`https://ams.wingsvpn.shop/miniapp/sub/{user_id}`.

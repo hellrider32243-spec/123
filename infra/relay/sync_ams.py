@@ -56,12 +56,16 @@ def all_clients() -> list[dict]:
 def render_config(params: dict, clients: list[dict]) -> dict:
     flow = params.get("flow", "xtls-rprx-vision")
     sni = params["sni"]
+    # Listen on loopback only — public :443 is nginx stream (SNI split:
+    # ams.wingsvpn.shop → subscription HTTPS; default → this Reality inbound).
+    listen = params.get("listen", "127.0.0.1")
+    port = int(params.get("xray_port", params.get("port", 10443)))
     return {
         "log": {"loglevel": "warning"},
         "inbounds": [
             {
-                "listen": "0.0.0.0",
-                "port": int(params.get("port", 443)),
+                "listen": listen,
+                "port": port,
                 "protocol": "vless",
                 "settings": {
                     "clients": [
