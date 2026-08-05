@@ -72,6 +72,17 @@ CF_WS_PATH = _env("CF_WS_PATH", "/cfws")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "chrome")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
+# === Amsterdam clean-IP TCP Reality ===
+# Отдельный сервер с «чистым» IP (не Cloudflare, не заблокированный основной).
+# Прямое VLESS+TCP+Reality (xtls-rprx-vision) на :443 — как у конкурента.
+AMS_HOST = _env("AMS_HOST", "")
+AMS_PORT = int(_env("AMS_PORT", "443"))
+AMS_PBK = _env("AMS_PBK", "")
+AMS_SID = _env("AMS_SID", REALITY_SID)
+AMS_SNI = _env("AMS_SNI", "www.apple.com")
+AMS_FP = _env("AMS_FP", "chrome")
+AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
+PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды — 🚀 Чистый")
 PROFILE_TITLE = _env("VPN_PROFILE_NAME", "TritonVPN")
 COUNTRY_LABEL = _env("VPN_COUNTRY_LABEL", "🇩🇪 Германия")
 VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "2") or "2"))
@@ -1851,6 +1862,48 @@ def build_cloudflare_ws_config(
     )
 
 
+def build_amsterdam_reality_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    sni: Optional[str] = None,
+    pbk: Optional[str] = None,
+    sid: Optional[str] = None,
+    fingerprint: Optional[str] = None,
+    flow: Optional[str] = None,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    **_: Any,
+) -> dict[str, Any]:
+    """VLESS + TCP + Reality (xtls-rprx-vision) на выделенном чистом IP (Amsterdam).
+    Прямое подключение к :443, минуя заблокированный IP основного сервера — трафик
+    неотличим от обычного HTTPS к живому сайту, как у конкурента."""
+    remark = display_name or PROFILE_AMS
+    outbound = _tcp_outbound(
+        client_uuid,
+        host=host or AMS_HOST,
+        port=int(port or AMS_PORT),
+        sni=sni or AMS_SNI,
+        pbk=pbk or AMS_PBK,
+        sid=sid or AMS_SID,
+        fingerprint=fingerprint or AMS_FP or "chrome",
+        flow=flow or AMS_FLOW,
+        with_fragment=False,
+    )
+    return _base_config(
+        remark,
+        outbound,
+        meta=_happ_meta(
+            user_id=user_id,
+            extra={"serverDescription": "🇳🇱 Amsterdam · чистый IP · Reality · обход блокировок"},
+        ),
+        routing=_ultima_routing_rules(),
+        dns_servers=["8.8.8.8", "8.8.4.4"],
+    )
+
+
 def build_whitelist_lte_config(
     client_uuid: str,
     base_remark: str = COUNTRY_LABEL,
@@ -1923,8 +1976,13 @@ def build_happ_json_subscription(
         "fingerprint": p.get("fp") or None,
         "user_id": user_id,
     }
-    profiles = [
-        # 0) Cloudflare WS (proxied) — обход блокировки IP сервера в РФ. Первый = приоритетный.
+    profiles = []
+    # 0) Amsterdam чистый IP, прямой TCP Reality :443 — приоритетный, как у конкурента.
+    #    Активен только когда сервер настроен (AMS_HOST + AMS_PBK в .env).
+    if AMS_HOST and AMS_PBK:
+        profiles.append(build_amsterdam_reality_config(uuid, country, user_id=user_id))
+    profiles += [
+        # 1) Cloudflare WS (proxied) — запасной обход блокировки IP сервера в РФ.
         build_cloudflare_ws_config(uuid, country, user_id=user_id),
         # 1) TCP Reality :443 (белые списки / hh.ru) — без fragment (nginx ssl_preread)
         build_auto_balancer_config(

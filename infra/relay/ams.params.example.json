@@ -1,0 +1,9 @@
+{
+  "host": "RELAY_PUBLIC_IP",
+  "port": 443,
+  "privateKey": "REALITY_PRIVATE_KEY_FROM_xray_x25519",
+  "publicKey": "REALITY_PUBLIC_KEY_FROM_xray_x25519",
+  "shortId": "8_HEX_CHARS",
+  "sni": "www.apple.com",
+  "flow": "xtls-rprx-vision"
+}
