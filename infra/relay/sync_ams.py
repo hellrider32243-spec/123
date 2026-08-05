@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Sync the standalone Amsterdam clean-IP Reality node with the union of x-ui
-client UUIDs and push the rendered Xray config over SSH.
+"""Sync the Amsterdam clean-IP Reality node with x-ui client UUIDs.
 
-Runs on the MAIN server (has x-ui.db + SSH key to the relay). Renders a VLESS
-TCP Reality (xtls-rprx-vision) inbound serving every current subscriber, tests
-it remotely with `xray -test`, and restarts the relay only when the config
-actually changed. Secrets (Reality private key, relay IP) live in
-PARAMS_PATH, never in the repo.
+Renders Ultima-style inbounds on the relay:
+  - TCP Reality (xtls-rprx-vision) on 127.0.0.1:10443  (nginx stream :443 → here)
+  - gRPC Reality on 0.0.0.0:49713  (SNI apple.com)   — like Ultima «Нидерланды»
+  - gRPC Reality on 0.0.0.0:41028  (SNI deepl.com)   — like Ultima «Hysteria» / NL#2
+
+Pushes over SSH; restarts xray only when the config changes. Also syncs the
+Hysteria2 UUID allow-list (optional real hy2 on :8447).
 """
+from __future__ import annotations
+
 import hashlib
 import json
 import os
@@ -20,6 +23,7 @@ SSH_KEY = os.getenv("AMS_SSH_KEY", "/root/.ssh/id_ed25519")
 REMOTE_CFG = "/usr/local/etc/xray/config.json"
 REMOTE_STAGING = "/usr/local/etc/xray/config.staging.json"
 REMOTE_HY_ALLOW = "/etc/hysteria/allowed_uuids.txt"
+CACHE = "/opt/nordwings/relay/.ams_last_sha"
 HY_CACHE = "/opt/nordwings/relay/.ams_hy_last_sha"
 SSH_OPTS = [
     "-o", "StrictHostKeyChecking=no",
@@ -53,45 +57,119 @@ def all_clients() -> list[dict]:
     return [{"id": u, "email": e} for u, e in seen.items()]
 
 
+def _reality_clients(clients: list[dict], flow: str = "") -> list[dict]:
+    out = []
+    for c in clients:
+        entry = {"id": c["id"], "email": c["email"]}
+        if flow:
+            entry["flow"] = flow
+        out.append(entry)
+    return out
+
+
 def render_config(params: dict, clients: list[dict]) -> dict:
     flow = params.get("flow", "xtls-rprx-vision")
-    sni = params["sni"]
-    # Listen on loopback only — public :443 is nginx stream (SNI split:
-    # ams.wingsvpn.shop → subscription HTTPS; default → this Reality inbound).
-    listen = params.get("listen", "127.0.0.1")
-    port = int(params.get("xray_port", params.get("port", 10443)))
+    priv = params["privateKey"]
+    sid = params["shortId"]
+    sid2 = params.get("shortId2") or sid
+    tcp_sni = params.get("sni", "www.apple.com")
+    grpc_sni = params.get("grpc_sni", "apple.com")
+    grpc2_sni = params.get("grpc2_sni", "deepl.com")
+    grpc_port = int(params.get("grpc_port", 49713))
+    grpc2_port = int(params.get("grpc2_port", 41028))
+    grpc_service = params.get("grpc_service", "ws")
+    grpc2_service = params.get("grpc2_service", "deepl")
+    xray_port = int(params.get("xray_port", 10443))
+
+    def reality_settings(server_names: list[str], dest: str, short_id: str) -> dict:
+        return {
+            "show": False,
+            "dest": dest,
+            "xver": 0,
+            "serverNames": server_names,
+            "privateKey": priv,
+            "shortIds": ["", short_id],
+        }
+
+    inbounds = [
+        # TCP Reality behind nginx stream (public :443)
+        {
+            "tag": "ams-tcp",
+            "listen": params.get("listen", "127.0.0.1"),
+            "port": xray_port,
+            "protocol": "vless",
+            "settings": {
+                "clients": _reality_clients(clients, flow=flow),
+                "decryption": "none",
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "reality",
+                "realitySettings": reality_settings(
+                    [tcp_sni, "apple.com", "www.apple.com"],
+                    f"{tcp_sni}:443",
+                    sid,
+                ),
+            },
+            "sniffing": {
+                "enabled": True,
+                "destOverride": ["http", "tls", "quic"],
+            },
+        },
+        # gRPC Reality — Ultima «Нидерланды»
+        {
+            "tag": "ams-grpc",
+            "listen": "0.0.0.0",
+            "port": grpc_port,
+            "protocol": "vless",
+            "settings": {
+                "clients": _reality_clients(clients, flow=""),
+                "decryption": "none",
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "grpcSettings": {"serviceName": grpc_service},
+                "security": "reality",
+                "realitySettings": reality_settings(
+                    [grpc_sni, "www.apple.com", "apple.com"],
+                    f"{grpc_sni}:443",
+                    sid,
+                ),
+            },
+            "sniffing": {
+                "enabled": True,
+                "destOverride": ["http", "tls", "quic"],
+            },
+        },
+        # gRPC Reality #2 — Ultima «Hysteria» / NL#2 style
+        {
+            "tag": "ams-grpc2",
+            "listen": "0.0.0.0",
+            "port": grpc2_port,
+            "protocol": "vless",
+            "settings": {
+                "clients": _reality_clients(clients, flow=""),
+                "decryption": "none",
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "grpcSettings": {"serviceName": grpc2_service},
+                "security": "reality",
+                "realitySettings": reality_settings(
+                    [grpc2_sni, f"www.{grpc2_sni}"],
+                    f"{grpc2_sni}:443",
+                    sid2,
+                ),
+            },
+            "sniffing": {
+                "enabled": True,
+                "destOverride": ["http", "tls", "quic"],
+            },
+        },
+    ]
     return {
         "log": {"loglevel": "warning"},
-        "inbounds": [
-            {
-                "listen": listen,
-                "port": port,
-                "protocol": "vless",
-                "settings": {
-                    "clients": [
-                        {"id": c["id"], "flow": flow, "email": c["email"]}
-                        for c in clients
-                    ],
-                    "decryption": "none",
-                },
-                "streamSettings": {
-                    "network": "tcp",
-                    "security": "reality",
-                    "realitySettings": {
-                        "show": False,
-                        "dest": f"{sni}:443",
-                        "xver": 0,
-                        "serverNames": [sni],
-                        "privateKey": params["privateKey"],
-                        "shortIds": ["", params["shortId"]],
-                    },
-                },
-                "sniffing": {
-                    "enabled": True,
-                    "destOverride": ["http", "tls", "quic"],
-                },
-            }
-        ],
+        "inbounds": inbounds,
         "outbounds": [
             {"protocol": "freedom", "tag": "direct"},
             {"protocol": "blackhole", "tag": "block"},
@@ -122,8 +200,6 @@ def scp(host: str, local: str, remote: str) -> subprocess.CompletedProcess:
 
 
 def sync_hysteria_allowlist(host: str, clients: list[dict]) -> None:
-    """Push the UUID allow-list for the relay Hysteria2 auth command.
-    The auth script reads it fresh per attempt, so no restart is needed."""
     blob = "\n".join(sorted(c["id"] for c in clients)) + "\n"
     digest = hashlib.sha256(blob.encode()).hexdigest()
     cached = ""
@@ -153,15 +229,12 @@ def main() -> int:
     blob = json.dumps(cfg, indent=2, ensure_ascii=False)
     digest = hashlib.sha256(blob.encode()).hexdigest()
 
-    remote_hash = ssh(host, f"sha256sum {REMOTE_CFG} 2>/dev/null | cut -d' ' -f1").stdout.strip()
-    local_of_remote = ""
-    # Compare against a locally cached digest of what we last pushed.
-    cache = "/opt/nordwings/relay/.ams_last_sha"
-    if os.path.exists(cache):
-        with open(cache) as f:
-            local_of_remote = f.read().strip()
-    if digest == local_of_remote and remote_hash:
-        print(f"no change ({len(clients)} clients)")
+    cached = ""
+    if os.path.exists(CACHE):
+        with open(CACHE) as f:
+            cached = f.read().strip()
+    if digest == cached:
+        print(f"no change ({len(clients)} clients, 3 inbounds)")
         return 0
 
     tmp = "/tmp/ams_config.json"
@@ -177,9 +250,14 @@ def main() -> int:
         ssh(host, f"rm -f {REMOTE_STAGING}")
         return 1
     ssh(host, f"mv {REMOTE_STAGING} {REMOTE_CFG} && systemctl restart xray")
-    with open(cache, "w") as f:
+    with open(CACHE, "w") as f:
         f.write(digest)
-    print(f"updated -> {len(clients)} clients on {host}, xray restarted")
+    print(
+        f"updated -> {len(clients)} clients, "
+        f"tcp:{params.get('xray_port', 10443)} "
+        f"grpc:{params.get('grpc_port', 49713)} "
+        f"grpc2:{params.get('grpc2_port', 41028)} on {host}"
+    )
     return 0
 
 

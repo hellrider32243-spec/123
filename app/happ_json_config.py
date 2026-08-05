@@ -72,22 +72,31 @@ CF_WS_PATH = _env("CF_WS_PATH", "/cfws")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "chrome")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
-# === Amsterdam clean-IP TCP Reality ===
-# Отдельный сервер с «чистым» IP (не Cloudflare, не заблокированный основной).
-# Прямое VLESS+TCP+Reality (xtls-rprx-vision) на :443 — как у конкурента.
+# === Amsterdam clean-IP — схема как у UltimaVPN ===
+# gRPC Reality на высоких портах + TCP Reality :443 + fragment.
 AMS_HOST = _env("AMS_HOST", "")
 AMS_PORT = int(_env("AMS_PORT", "443"))
 AMS_PBK = _env("AMS_PBK", "")
 AMS_SID = _env("AMS_SID", REALITY_SID)
+AMS_SID2 = _env("AMS_SID2", AMS_SID)
 AMS_SNI = _env("AMS_SNI", "www.apple.com")
-AMS_FP = _env("AMS_FP", "chrome")
+AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
 AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
-PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды — 🚀 Чистый")
-# Hysteria2 (UDP/QUIC) на том же чистом IP (отдельный домен ams.* с валидным cert).
-AMS_HYSTERIA_HOST = _env("AMS_HYSTERIA_HOST", "")
-AMS_HYSTERIA_PORT = int(_env("AMS_HYSTERIA_PORT", "8447"))
-AMS_HYSTERIA_SNI = _env("AMS_HYSTERIA_SNI", AMS_HYSTERIA_HOST or "ams.wingsvpn.shop")
-PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇳🇱 Amsterdam — 📡 Hysteria")
+PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
+# gRPC Reality #1 — основной профиль Ultima «Нидерланды»
+AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
+AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49713"))
+AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "apple.com")
+AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
+AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
+PROFILE_AMS_GRPC = _env("VPN_PROFILE_AMS_GRPC", "🇳🇱 Нидерланды")
+# gRPC Reality #2 — у Ultima называется «Hysteria» (это не hy2, а gRPC+Reality)
+AMS_GRPC2_HOST = _env("AMS_GRPC2_HOST", AMS_HOST)
+AMS_GRPC2_PORT = int(_env("AMS_GRPC2_PORT", "41028"))
+AMS_GRPC2_SNI = _env("AMS_GRPC2_SNI", "deepl.com")
+AMS_GRPC2_SERVICE = _env("AMS_GRPC2_SERVICE", "deepl")
+AMS_GRPC2_FP = _env("AMS_GRPC2_FP", "firefox")
+PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇪🇺 Hysteria")
 PROFILE_TITLE = _env("VPN_PROFILE_NAME", "TritonVPN")
 COUNTRY_LABEL = _env("VPN_COUNTRY_LABEL", "🇩🇪 Германия")
 VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "2") or "2"))
@@ -1380,7 +1389,10 @@ def _tcp_outbound(
         },
         "tag": tag,
     }
-    # Fragment на TCP Reality через nginx stream ломает SNI-preread → после connect интернет умирает.
+    # Ultima включает fragment и на TCP Reality. На Amsterdam default nginx → Reality,
+    # поэтому даже при «сломанном» SNI-preread трафик всё равно попадает в Xray.
+    if with_fragment:
+        _apply_fragment(outbound)
     return outbound
 
 
@@ -1882,9 +1894,7 @@ def build_amsterdam_reality_config(
     user_id: Optional[int] = None,
     **_: Any,
 ) -> dict[str, Any]:
-    """VLESS + TCP + Reality (xtls-rprx-vision) на выделенном чистом IP (Amsterdam).
-    Прямое подключение к :443, минуя заблокированный IP основного сервера — трафик
-    неотличим от обычного HTTPS к живому сайту, как у конкурента."""
+    """VLESS + TCP + Reality (xtls-rprx-vision) :443 — как Ultima «Швеция» / NL#2."""
     remark = display_name or PROFILE_AMS
     outbound = _tcp_outbound(
         client_uuid,
@@ -1893,19 +1903,63 @@ def build_amsterdam_reality_config(
         sni=sni or AMS_SNI,
         pbk=pbk or AMS_PBK,
         sid=sid or AMS_SID,
-        fingerprint=fingerprint or AMS_FP or "chrome",
+        fingerprint=fingerprint or AMS_FP or "qq",
         flow=flow or AMS_FLOW,
-        with_fragment=False,
+        with_fragment=True,
     )
     return _base_config(
         remark,
         outbound,
         meta=_happ_meta(
             user_id=user_id,
-            extra={"serverDescription": "🇳🇱 Amsterdam · чистый IP · Reality · обход блокировок"},
+            extra={"serverDescription": "VLESS | TCP | Reality | :443"},
         ),
         routing=_ultima_routing_rules(),
-        dns_servers=["8.8.8.8", "8.8.4.4"],
+        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+    )
+
+
+def build_amsterdam_grpc_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    sni: Optional[str] = None,
+    pbk: Optional[str] = None,
+    sid: Optional[str] = None,
+    service_name: Optional[str] = None,
+    fingerprint: Optional[str] = None,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    server_description: str = "VLESS | gRPC | Reality",
+    **_: Any,
+) -> dict[str, Any]:
+    """VLESS + gRPC + Reality на высоком порту — основной рабочий профиль Ultima."""
+    remark = display_name or PROFILE_AMS_GRPC
+    outbound = _grpc_outbound(
+        client_uuid,
+        host=host or AMS_GRPC_HOST or AMS_HOST,
+        port=int(port or AMS_GRPC_PORT),
+        sni=sni or AMS_GRPC_SNI,
+        pbk=pbk or AMS_PBK,
+        sid=sid or AMS_SID,
+        service_name=service_name or AMS_GRPC_SERVICE,
+        fingerprint=fingerprint or AMS_GRPC_FP or "firefox",
+        with_fragment=True,
+    )
+    # Ultima: mode=false, без multiMode
+    outbound["streamSettings"]["grpcSettings"]["multiMode"] = False
+    outbound["streamSettings"]["grpcSettings"]["mode"] = False
+    return _base_config(
+        remark,
+        outbound,
+        meta=_happ_meta(
+            user_id=user_id,
+            extra={"serverDescription": server_description},
+        ),
+        routing=_ultima_routing_rules(),
+        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
     )
 
 
@@ -1974,21 +2028,49 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Только два профиля, оба на чистом амстердамском IP:
-    #   0) Нидерланды — TCP Reality (основной), 1) Amsterdam — Hysteria2 (UDP/QUIC).
+    # Схема как у UltimaVPN — только чистый Amsterdam IP:
+    #   0) 🇳🇱 Нидерланды      — gRPC Reality :49713 (apple.com, firefox, fragment)
+    #   1) 🇳🇱 Нидерланды #2  — TCP Reality  :443   (vision, qq, fragment)
+    #   2) 🇪🇺 Hysteria         — gRPC Reality :41028 (deepl.com, firefox, fragment)
+    #      (у конкурента «Hysteria» — это тоже gRPC+Reality, не Hysteria2)
     profiles: list[dict[str, Any]] = []
     if AMS_HOST and AMS_PBK:
-        profiles.append(build_amsterdam_reality_config(uuid, country, user_id=user_id))
-    if AMS_HYSTERIA_HOST:
         profiles.append(
-            build_hysteria_lte_config(
+            build_amsterdam_grpc_config(
                 uuid,
                 country,
                 user_id=user_id,
-                host=AMS_HYSTERIA_HOST,
-                port=AMS_HYSTERIA_PORT,
-                sni=AMS_HYSTERIA_SNI,
+                host=AMS_GRPC_HOST or AMS_HOST,
+                port=AMS_GRPC_PORT,
+                sni=AMS_GRPC_SNI,
+                sid=AMS_SID,
+                service_name=AMS_GRPC_SERVICE,
+                fingerprint=AMS_GRPC_FP,
+                display_name=PROFILE_AMS_GRPC,
+                server_description="VLESS | gRPC | Reality",
+            )
+        )
+        profiles.append(
+            build_amsterdam_reality_config(
+                uuid,
+                country,
+                user_id=user_id,
+                display_name=PROFILE_AMS,
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC2_HOST or AMS_HOST,
+                port=AMS_GRPC2_PORT,
+                sni=AMS_GRPC2_SNI,
+                sid=AMS_SID2,
+                service_name=AMS_GRPC2_SERVICE,
+                fingerprint=AMS_GRPC2_FP,
                 display_name=PROFILE_AMS_HYSTERIA,
+                server_description="Hysteria",
             )
         )
     return profiles

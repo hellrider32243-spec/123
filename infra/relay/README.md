@@ -38,6 +38,17 @@ lossy LTE/4G, on the same clean IP:
   `sync_ams.py` (read fresh per auth attempt, so no restart on change).
 - Masquerade: HTTP/3 proxy to `https://www.cloudflare.com`.
 
+## Ultima-style profiles (current)
+
+Subscription returns **exactly 3 profiles**, all on the clean Amsterdam IP:
+
+1. `🇳🇱 Нидерланды` — VLESS + gRPC + Reality `:49713`, SNI `apple.com`, fp `firefox`, fragment `1-3/50-100/10-20`
+2. `🇳🇱 Нидерланды #2` — VLESS + TCP + Reality (`xtls-rprx-vision`) `:443`, SNI `www.apple.com`, fp `qq`, fragment
+3. `🇪🇺 Hysteria` — VLESS + gRPC + Reality `:41028`, SNI `deepl.com`, fp `firefox`, fragment  
+   (same naming as Ultima: this is **not** Hysteria2/QUIC, it is gRPC+Reality)
+
+Routing matches Ultima: `.ru` / yandex → direct, rest → proxy.
+
 ## Subscription wiring
 
 `app/happ_json_config.py` gains `build_amsterdam_reality_config(...)` (profile[0],

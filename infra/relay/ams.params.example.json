@@ -3,9 +3,16 @@
   "port": 443,
   "listen": "127.0.0.1",
   "xray_port": 10443,
+  "grpc_port": 49713,
+  "grpc2_port": 41028,
+  "grpc_service": "ws",
+  "grpc2_service": "deepl",
+  "grpc_sni": "apple.com",
+  "grpc2_sni": "deepl.com",
   "privateKey": "REALITY_PRIVATE_KEY_FROM_xray_x25519",
   "publicKey": "REALITY_PUBLIC_KEY_FROM_xray_x25519",
   "shortId": "8_HEX_CHARS",
+  "shortId2": "8_HEX_CHARS_OPTIONAL",
   "sni": "www.apple.com",
   "flow": "xtls-rprx-vision"
 }
