@@ -1892,9 +1892,11 @@ def build_amsterdam_reality_config(
     flow: Optional[str] = None,
     display_name: Optional[str] = None,
     user_id: Optional[int] = None,
+    with_fragment: bool = True,
+    server_description: str = "VLESS | TCP | Reality | :443",
     **_: Any,
 ) -> dict[str, Any]:
-    """VLESS + TCP + Reality (xtls-rprx-vision) :443 — как Ultima «Швеция» / NL#2."""
+    """VLESS + TCP + Reality (xtls-rprx-vision) :443 — самый быстрый профиль Amsterdam."""
     remark = display_name or PROFILE_AMS
     outbound = _tcp_outbound(
         client_uuid,
@@ -1905,14 +1907,14 @@ def build_amsterdam_reality_config(
         sid=sid or AMS_SID,
         fingerprint=fingerprint or AMS_FP or "qq",
         flow=flow or AMS_FLOW,
-        with_fragment=True,
+        with_fragment=with_fragment,
     )
     return _base_config(
         remark,
         outbound,
         meta=_happ_meta(
             user_id=user_id,
-            extra={"serverDescription": "VLESS | TCP | Reality | :443"},
+            extra={"serverDescription": server_description},
         ),
         routing=_ultima_routing_rules(),
         dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
@@ -2028,13 +2030,23 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Схема как у UltimaVPN — только чистый Amsterdam IP:
-    #   0) 🇳🇱 Нидерланды      — gRPC Reality :49713 (apple.com, firefox, fragment)
-    #   1) 🇳🇱 Нидерланды #2  — TCP Reality  :443   (vision, qq, fragment)
-    #   2) 🇪🇺 Hysteria         — gRPC Reality :41028 (deepl.com, firefox, fragment)
-    #      (у конкурента «Hysteria» — это тоже gRPC+Reality, не Hysteria2)
+    # Только чистый Amsterdam IP. Порядок по бенчмарку (download через xray):
+    #   0) 🇳🇱 Нидерланды — 🚀 Турбо — TCP Reality :443 vision/qq, БЕЗ fragment (самый быстрый)
+    #   1) 🇳🇱 Нидерланды            — gRPC Reality :49713 (обход DPI)
+    #   2) 🇪🇺 Hysteria               — gRPC Reality :41028
     profiles: list[dict[str, Any]] = []
     if AMS_HOST and AMS_PBK:
+        turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
+        profiles.append(
+            build_amsterdam_reality_config(
+                uuid,
+                country,
+                user_id=user_id,
+                display_name=turbo_name,
+                with_fragment=False,
+                server_description="⚡ Быстрый · TCP Reality · без fragment",
+            )
+        )
         profiles.append(
             build_amsterdam_grpc_config(
                 uuid,
@@ -2048,14 +2060,6 @@ def build_happ_json_subscription(
                 fingerprint=AMS_GRPC_FP,
                 display_name=PROFILE_AMS_GRPC,
                 server_description="VLESS | gRPC | Reality",
-            )
-        )
-        profiles.append(
-            build_amsterdam_reality_config(
-                uuid,
-                country,
-                user_id=user_id,
-                display_name=PROFILE_AMS,
             )
         )
         profiles.append(
