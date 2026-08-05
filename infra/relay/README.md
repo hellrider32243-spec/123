@@ -104,3 +104,22 @@ Fix: nginx on the relay does SNI-split on `:443`:
 
 Subscription and «Add to Happ» links must use
 `https://ams.wingsvpn.shop/miniapp/sub/{user_id}`.
+
+## Happ deep link (Android / iOS)
+
+Happ parses `happ://add/<https-url>#<profileName>`. Everything after `#` is the
+**profile name only**. Appending `?fragment=50-100,...` after `#TritonVPN`
+makes the profile name `TritonVPN?fragment=...` and import fails on both
+Android and iOS.
+
+Correct:
+
+```
+happ://add/https://ams.wingsvpn.shop/miniapp/sub/{id}#TritonVPN
+```
+
+Fragmentation belongs **inside** the JSON outbound (`"fragment": {...}`), not
+in the deep-link URL. `app/app_import_links.py` builds the deep link / Android
+`intent://` bridge; set `HAPP_DEEP_LINK_FRAGMENT=0` and
+`PUBLIC_APP_BASE_URL=https://ams.wingsvpn.shop` so Mini App open-app pages are
+reachable on RU mobile.
