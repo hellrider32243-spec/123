@@ -19,6 +19,8 @@ PARAMS_PATH = os.getenv("AMS_PARAMS_PATH", "/opt/nordwings/relay/ams.params.json
 SSH_KEY = os.getenv("AMS_SSH_KEY", "/root/.ssh/id_ed25519")
 REMOTE_CFG = "/usr/local/etc/xray/config.json"
 REMOTE_STAGING = "/usr/local/etc/xray/config.staging.json"
+REMOTE_HY_ALLOW = "/etc/hysteria/allowed_uuids.txt"
+HY_CACHE = "/opt/nordwings/relay/.ams_hy_last_sha"
 SSH_OPTS = [
     "-o", "StrictHostKeyChecking=no",
     "-o", "ConnectTimeout=10",
@@ -115,10 +117,34 @@ def scp(host: str, local: str, remote: str) -> subprocess.CompletedProcess:
     )
 
 
+def sync_hysteria_allowlist(host: str, clients: list[dict]) -> None:
+    """Push the UUID allow-list for the relay Hysteria2 auth command.
+    The auth script reads it fresh per attempt, so no restart is needed."""
+    blob = "\n".join(sorted(c["id"] for c in clients)) + "\n"
+    digest = hashlib.sha256(blob.encode()).hexdigest()
+    cached = ""
+    if os.path.exists(HY_CACHE):
+        with open(HY_CACHE) as f:
+            cached = f.read().strip()
+    if digest == cached:
+        return
+    tmp = "/tmp/ams_allowed_uuids.txt"
+    with open(tmp, "w") as f:
+        f.write(blob)
+    r = scp(host, tmp, REMOTE_HY_ALLOW)
+    if r.returncode != 0:
+        print("hysteria allowlist scp failed:", r.stderr, file=sys.stderr)
+        return
+    with open(HY_CACHE, "w") as f:
+        f.write(digest)
+    print(f"hysteria allow-list updated -> {len(clients)} uuids on {host}")
+
+
 def main() -> int:
     params = load_params()
     host = params["host"]
     clients = all_clients()
+    sync_hysteria_allowlist(host, clients)
     cfg = render_config(params, clients)
     blob = json.dumps(cfg, indent=2, ensure_ascii=False)
     digest = hashlib.sha256(blob.encode()).hexdigest()

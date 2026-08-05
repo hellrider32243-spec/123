@@ -1,0 +1,15 @@
+[Unit]
+Description=Hysteria2 Server (NordWings relay)
+Documentation=https://v2.hysteria.network/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/hysteria server -c /etc/hysteria/config.yaml
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

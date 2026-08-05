@@ -24,11 +24,36 @@ the main node.
 - **`ams-sync.service` + `ams-sync.timer`**: run `sync_ams.py` every 120 s so new
   and renewing users are provisioned on the relay automatically.
 
+## Hysteria2 (second profile)
+
+The relay also runs a standalone **Hysteria2** server (UDP/QUIC) on `:8447` for
+lossy LTE/4G, on the same clean IP:
+
+- Binary `/usr/local/bin/hysteria`, config `/etc/hysteria/config.yaml`, unit
+  `hysteria-server.service`.
+- TLS: a real Let's Encrypt cert for `ams.wingsvpn.shop` (DNS-only A record →
+  relay IP), so an active prober sees a valid cert for a real domain.
+- Auth: `type: command` → `/etc/hysteria/hy2_check_auth.py`, which accepts a UUID
+  present in `/etc/hysteria/allowed_uuids.txt`. The list is pushed by
+  `sync_ams.py` (read fresh per auth attempt, so no restart on change).
+- Masquerade: HTTP/3 proxy to `https://www.cloudflare.com`.
+
 ## Subscription wiring
 
-`app/happ_json_config.py` gains `build_amsterdam_reality_config(...)` and inserts
-it as **profile[0]** (highest priority) in `build_happ_json_subscription`, guarded
-by `AMS_HOST` + `AMS_PBK` so it is a no-op until the relay is configured.
+`app/happ_json_config.py` gains `build_amsterdam_reality_config(...)` (profile[0],
+TCP Reality) and reuses `build_hysteria_lte_config(...)` pointed at
+`AMS_HYSTERIA_HOST` (profile[1], Hysteria2). `build_happ_json_subscription` now
+returns **only these two clean-IP profiles**, each guarded by its env
+(`AMS_HOST`+`AMS_PBK`, and `AMS_HYSTERIA_HOST`).
+
+Hysteria env (both `.env` files):
+
+```
+AMS_HYSTERIA_HOST=ams.wingsvpn.shop
+AMS_HYSTERIA_PORT=8447
+AMS_HYSTERIA_SNI=ams.wingsvpn.shop
+VPN_PROFILE_AMS_HYSTERIA=🇳🇱 Amsterdam — 📡 Hysteria
+```
 
 Relevant env (main `.env` and `/opt/nordwings-web/.env`):
 

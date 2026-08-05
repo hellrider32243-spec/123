@@ -83,6 +83,11 @@ AMS_SNI = _env("AMS_SNI", "www.apple.com")
 AMS_FP = _env("AMS_FP", "chrome")
 AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
 PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды — 🚀 Чистый")
+# Hysteria2 (UDP/QUIC) на том же чистом IP (отдельный домен ams.* с валидным cert).
+AMS_HYSTERIA_HOST = _env("AMS_HYSTERIA_HOST", "")
+AMS_HYSTERIA_PORT = int(_env("AMS_HYSTERIA_PORT", "8447"))
+AMS_HYSTERIA_SNI = _env("AMS_HYSTERIA_SNI", AMS_HYSTERIA_HOST or "ams.wingsvpn.shop")
+PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇳🇱 Amsterdam — 📡 Hysteria")
 PROFILE_TITLE = _env("VPN_PROFILE_NAME", "TritonVPN")
 COUNTRY_LABEL = _env("VPN_COUNTRY_LABEL", "🇩🇪 Германия")
 VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "2") or "2"))
@@ -1969,78 +1974,23 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    common = {
-        "sni": p.get("sni") or None,
-        "pbk": p.get("pbk") or None,
-        "sid": p.get("sid") or None,
-        "fingerprint": p.get("fp") or None,
-        "user_id": user_id,
-    }
-    profiles = []
-    # 0) Amsterdam чистый IP, прямой TCP Reality :443 — приоритетный, как у конкурента.
-    #    Активен только когда сервер настроен (AMS_HOST + AMS_PBK в .env).
+    # Только два профиля, оба на чистом амстердамском IP:
+    #   0) Нидерланды — TCP Reality (основной), 1) Amsterdam — Hysteria2 (UDP/QUIC).
+    profiles: list[dict[str, Any]] = []
     if AMS_HOST and AMS_PBK:
         profiles.append(build_amsterdam_reality_config(uuid, country, user_id=user_id))
-    profiles += [
-        # 1) Cloudflare WS (proxied) — запасной обход блокировки IP сервера в РФ.
-        build_cloudflare_ws_config(uuid, country, user_id=user_id),
-        # 1) TCP Reality :443 (белые списки / hh.ru) — без fragment (nginx ssl_preread)
-        build_auto_balancer_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            sni=common.get("sni") or REALITY_SNI,
-            grpc_fingerprint=common.get("fingerprint"),
-        ),
-        # 2) XHTTP :8445 — запасной LTE-обход (не за nginx preread)
-        build_xhttp_lte_config(uuid, country, user_id=user_id, host=XHTTP_PUBLIC_HOST),
-        build_whitelist_lte_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-        ),
-        build_hysteria_lte_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=HYSTERIA_PUBLIC_HOST,
-        ),
-        build_grpc_turbo_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            sni=common.get("sni") or REALITY_SNI,
-        ),
-        build_grpc_fast_config(uuid, country, **common),
-        build_grpc_antiblock_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-        ),
-        build_youtube_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            # TCP :443 Reality — только hh.ru (не SNI из gRPC vless)
-            sni=None,
-            fingerprint=common.get("fingerprint"),
-        ),
-    ]
+    if AMS_HYSTERIA_HOST:
+        profiles.append(
+            build_hysteria_lte_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_HYSTERIA_HOST,
+                port=AMS_HYSTERIA_PORT,
+                sni=AMS_HYSTERIA_SNI,
+                display_name=PROFILE_AMS_HYSTERIA,
+            )
+        )
     return profiles
 
 

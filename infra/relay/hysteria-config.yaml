@@ -1,0 +1,36 @@
+# NordWings relay — standalone Hysteria2 (UDP/QUIC) on the clean Amsterdam IP.
+# Auth: command → UUID must be in the synced allow-list (see hy2_check_auth.py).
+listen: :8447
+
+tls:
+  cert: /etc/letsencrypt/live/ams.wingsvpn.shop/fullchain.pem
+  key: /etc/letsencrypt/live/ams.wingsvpn.shop/privkey.pem
+
+auth:
+  type: command
+  command: /etc/hysteria/hy2_check_auth.py
+
+bandwidth:
+  up: 10 gbps
+  down: 10 gbps
+ignoreClientBandwidth: true
+
+quic:
+  initStreamReceiveWindow: 8388608
+  maxStreamReceiveWindow: 8388608
+  initConnReceiveWindow: 20971520
+  maxConnReceiveWindow: 20971520
+  maxIdleTimeout: 30s
+  keepAlivePeriod: 10s
+  disablePathMTUDiscovery: false
+
+# HTTP/3 masquerade for active probes.
+masquerade:
+  type: proxy
+  proxy:
+    url: https://www.cloudflare.com
+    rewriteHost: true
+
+outbounds:
+  - name: direct
+    type: direct
