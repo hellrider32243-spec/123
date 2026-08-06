@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+# relay secrets (Reality private key, relay IP) — server-only, never commit
+infra/relay/ams.params.json
+infra/relay/.ams_last_sha

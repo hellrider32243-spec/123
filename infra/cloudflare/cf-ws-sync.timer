@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic cf-ws client sync
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=120
+AccuracySec=15
+
+[Install]
+WantedBy=timers.target

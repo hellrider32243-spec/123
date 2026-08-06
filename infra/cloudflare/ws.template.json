@@ -1,0 +1,30 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "/opt/nordwings/cf/ws-access.log",
+    "error": "/opt/nordwings/cf/ws-error.log"
+  },
+  "inbounds": [
+    {
+      "listen": "127.0.0.1",
+      "port": 8880,
+      "protocol": "vless",
+      "tag": "cf-ws-in",
+      "settings": {
+        "clients": [
+          { "id": "00000000-0000-0000-0000-000000000000", "email": "placeholder" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "none",
+        "wsSettings": { "path": "/cfws" }
+      },
+      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"] }
+    }
+  ],
+  "outbounds": [
+    { "protocol": "freedom", "tag": "direct", "settings": { "domainStrategy": "UseIPv4" } }
+  ]
+}
