@@ -72,12 +72,13 @@ CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "safari")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
-# === Amsterdam clean-IP — схема как у UltimaVPN ===
-# gRPC Reality на высоких портах + TCP Reality :443 + fragment.
-AMS_HOST = _env("AMS_HOST", "")
+# === Amsterdam clean-IP (4VPS nLighten) — схема как у UltimaVPN ===
+# gRPC Reality на высоком порту + TCP Reality :443 + fragment.
+# Публичный ключ можно держать в репо; privateKey только на VPS.
+AMS_HOST = _env("AMS_HOST", "139.28.240.160")
 AMS_PORT = int(_env("AMS_PORT", "443"))
-AMS_PBK = _env("AMS_PBK", "")
-AMS_SID = _env("AMS_SID", REALITY_SID)
+AMS_PBK = _env("AMS_PBK", "-IYnX45q6qyRMrl_bTLLeW97TCBdZW0aTNu7WBF4Nm0")
+AMS_SID = _env("AMS_SID", "a7c31e04")
 AMS_SID2 = _env("AMS_SID2", AMS_SID)
 AMS_SNI = _env("AMS_SNI", "deepl.com")
 AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
@@ -85,7 +86,7 @@ AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
 PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
 # gRPC Reality #1 — основной профиль Ultima «Нидерланды»
 AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
-AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49713"))
+AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49714"))
 AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "deepl.com")
 AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
 AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
@@ -2054,22 +2055,25 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # AMS IP с РФ: TCP есть, TLS 0 байт (TSPU). Ultima NL — другой IP (ios.appl.ltd).
-    # Все профили — Cloudflare anycast, иначе телефон ходит на засвеченный IP.
-    # Новые remarks, чтобы iOS не держал старый Reality.
-    ws_nl = "🇳🇱 Нидерланды · сайт"
-    turbo_name = "🚀 Турбо · сайт"
-    hy_name = "🇪🇺 Hysteria · сайт"
+    # 4VPS nLighten (чистый IP, не Cloudzy). Новые remarks — iOS кэширует по имени.
+    nl_name = "🇳🇱 Нидерланды · Reality"
+    turbo_name = "🚀 Турбо · Reality"
     cf_name = "☁️ Cloudflare · сайт"
     profiles: list[dict[str, Any]] = [
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=ws_nl
+        build_amsterdam_grpc_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=nl_name,
+            server_description="VLESS | gRPC | Reality | 4VPS nLighten :49714",
         ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=turbo_name
-        ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=hy_name
+        build_amsterdam_reality_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=turbo_name,
+            with_fragment=True,
+            server_description="VLESS | TCP | Reality | 4VPS nLighten :443",
         ),
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=cf_name
