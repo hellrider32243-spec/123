@@ -8,16 +8,26 @@ level. Direct Reality to Apple SNI on those IPs often TCP-handshakes then dies
 without an authenticated Xray session. That is not an Xray/Nginx crash — the
 servers are healthy from outside Russia.
 
-The fix routes clients to Cloudflare's anycast IPs (which Russian networks do not
-mass-block) via a Cloudflare Tunnel, using a clean SNI on the customer domain
-(`cf.wingsvpn.shop`) instead of a flagged tunnel domain.
+Two WS paths share the same Xray inbound (`127.0.0.1:8880`, path `/cfws`):
+
+1. **Origin HTTPS (default for Happ)** — SNI `ams.wingsvpn.shop`. That hostname
+   already works from Russia for subscription fetch (grey DNS, Let's Encrypt).
+   nginx stream sends that SNI to `:8080`, which upgrades `/cfws` to Xray.
+   Reality on the same IP is DPI'd; this looks like the working HTTPS site.
+2. **Cloudflare anycast (fallback profile)** — SNI `cf.wingsvpn.shop` via Tunnel.
+   Useful if the origin IP is fully blocked; some RU mobile networks never
+   complete the tunnel handshake from the phone.
 
 ## Data path
 
 ```
-Client (Happ)  --TLS/WS :443, SNI=cf.wingsvpn.shop-->  Cloudflare edge (anycast)
-   --QUIC tunnel-->  cloudflared on VPS  --http://127.0.0.1:8880-->  Xray VLESS-WS
-   --freedom-->  Internet
+# Origin (Happ Turbo / Нидерланды / Hysteria)
+Client --TLS/WS :443, SNI=ams.wingsvpn.shop--> AMS nginx stream → :8080 /cfws
+   --> Xray VLESS-WS :8880 --> freedom
+
+# Cloudflare fallback (☁️ Cloudflare profile)
+Client --TLS/WS :443, SNI=cf.wingsvpn.shop--> Cloudflare edge (anycast)
+   --QUIC tunnel--> cloudflared --> Xray VLESS-WS :8880 --> freedom
 ```
 
 ## Components (deployed on the VPS)
@@ -45,10 +55,11 @@ Client (Happ)  --TLS/WS :443, SNI=cf.wingsvpn.shop-->  Cloudflare edge (anycast)
 
 `happ_json_config.py`:
 - `_ws_outbound()` builds the VLESS+WS+TLS outbound.
-- `build_cloudflare_ws_config()` builds the Happ profile
-  (`☁️ Cloudflare — обход блокировок`).
-- It is inserted as the **first / highest-priority** profile in
-  `build_happ_json_subscription()`.
+- Turbo / Нидерланды / Hysteria → origin `ams.wingsvpn.shop/cfws?ed=2560`.
+- Named Cloudflare profile → `cf.wingsvpn.shop` (anycast fallback).
 
 Environment overrides (optional): `CF_WS_HOST`, `CF_WS_PORT`, `CF_WS_PATH`,
-`CF_WS_SNI`, `CF_WS_FP`, `VPN_PROFILE_CF`.
+`CF_WS_SNI`, `CF_WS_FP`, `CF_ORANGE_HOST`, `VPN_PROFILE_CF`.
+
+nginx location: `infra/nginx/ams-cfws.location.conf` (live file is AMS
+`/etc/nginx/nginx.conf`).

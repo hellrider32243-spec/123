@@ -65,10 +65,11 @@ TCP_CLIENT_PORT = int(_env("TCP_CLIENT_PORT", _env("TCP_PUBLIC_PORT", "443")))
 TCP_PORT = TCP_CLIENT_PORT
 WHITELIST_SNI = _env("WHITELIST_SNI", "hh.ru")
 TCP_VLESS_FLOW = _env("TCP_VLESS_FLOW", "xtls-rprx-vision")
-# Cloudflare-фронтинг: VLESS+WS+TLS через proxied-домен (обход блокировки IP сервера в РФ)
-CF_WS_HOST = _env("CF_WS_HOST", "cf.wingsvpn.shop")
+# VLESS+WS+TLS на том же HTTPS, что и подписка (ams.wingsvpn.shop) —
+# Reality/cf.* с телефона в РФ не поднимаются, а этот SNI уже открывается.
+CF_WS_HOST = _env("CF_WS_HOST", "ams.wingsvpn.shop")
 CF_WS_PORT = int(_env("CF_WS_PORT", "443"))
-CF_WS_PATH = _env("CF_WS_PATH", "/cfws")
+CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "chrome")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
@@ -1338,8 +1339,8 @@ def _ws_outbound(
     fingerprint: str,
     tag: str = "proxy",
 ) -> dict[str, Any]:
-    """VLESS + WebSocket + TLS. Через Cloudflare (proxied) клиент коннектится к IP CF,
-    поэтому блокировка IP сервера в РФ не срабатывает. SNI = чистый домен cf.*."""
+    """VLESS + WebSocket + TLS. С РФ ходим на ams.wingsvpn.shop (тот же SNI/серт,
+    что и у подписки), nginx /cfws → xray :8880. cf.* оставляем как опцию через env."""
     user: dict[str, Any] = {"encryption": "none", "id": client_uuid}
     return {
         "protocol": "vless",
@@ -1873,9 +1874,8 @@ def build_cloudflare_ws_config(
     user_id: Optional[int] = None,
     **_: Any,
 ) -> dict[str, Any]:
-    """VLESS + WebSocket + TLS через Cloudflare (proxied cf.*).
-    Клиент коннектится к anycast-IP Cloudflare, а не к IP сервера, поэтому
-    IP-блокировка сервера российскими операторами обходится, а SNI остаётся чистым."""
+    """VLESS + WebSocket + TLS. По умолчанию — прямой HTTPS ams.wingsvpn.shop
+    (тот же SNI/серт, что и у подписки). host/sni можно переопределить на cf.*."""
     host = host or CF_WS_HOST
     remark = display_name or PROFILE_CF
     outbound = _ws_outbound(
@@ -1883,15 +1883,16 @@ def build_cloudflare_ws_config(
         host=host,
         port=int(port or CF_WS_PORT),
         path=path or CF_WS_PATH,
-        sni=sni or CF_WS_SNI,
+        sni=sni or (CF_WS_SNI if host == CF_WS_HOST else host),
         fingerprint=fingerprint or CF_WS_FP,
     )
+    via = "Cloudflare anycast" if host.startswith("cf.") else "origin HTTPS"
     return _base_config(
         remark,
         outbound,
         meta=_happ_meta(
             user_id=user_id,
-            extra={"serverDescription": "☁️ Cloudflare · обход блокировок · стабильно на мобильных"},
+            extra={"serverDescription": f"VLESS | WS | TLS | {host} | {via}"},
         ),
         routing=_ultima_routing_rules(),
         dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
@@ -2051,13 +2052,11 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Как Ultima: gRPC/TCP Reality + SNI deepl.com + fragment. Apple SNI в РФ мёртв.
-    # Cloudflare — запасной путь, если прямой IP режут.
+    # Reality на AMS IP с РФ не аутентифицируется (TCP есть, сессии в Xray нет).
+    # Подписка HTTPS ams.wingsvpn.shop с РФ открывается — тот же SNI несёт VLESS+WS.
+    # cf.* оставляем четвёртым профилем: anycast, если origin IP всё же режут.
     turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
-    # С РФ Reality на AMS IP рвётся (TCP есть, сессии в Xray нет — YouTube/Telegram
-    # висят в TUN). Турбо = Cloudflare WS; Telegram уходит direct.
-    # У Ultima «Нидерланды» — другой IP (ios.appl.ltd → 89.105.199.216:49714).
-    # Наш 107.189.22.142:49713 в РФ рвут. Пока нет чистого IP, то же имя = CF WS.
+    cf_orange = _env("CF_ORANGE_HOST", "cf.wingsvpn.shop")
     profiles: list[dict[str, Any]] = [
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=turbo_name
@@ -2068,7 +2067,13 @@ def build_happ_json_subscription(
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=PROFILE_AMS_HYSTERIA
         ),
-        build_cloudflare_ws_config(uuid, country, user_id=user_id),
+        build_cloudflare_ws_config(
+            uuid,
+            country,
+            user_id=user_id,
+            host=cf_orange,
+            sni=cf_orange,
+        ),
     ]
     return profiles
 
