@@ -65,9 +65,8 @@ TCP_CLIENT_PORT = int(_env("TCP_CLIENT_PORT", _env("TCP_PUBLIC_PORT", "443")))
 TCP_PORT = TCP_CLIENT_PORT
 WHITELIST_SNI = _env("WHITELIST_SNI", "hh.ru")
 TCP_VLESS_FLOW = _env("TCP_VLESS_FLOW", "xtls-rprx-vision")
-# VLESS+WS+TLS на том же HTTPS, что и подписка (ams.wingsvpn.shop) —
-# Reality/cf.* с телефона в РФ не поднимаются, а этот SNI уже открывается.
-CF_WS_HOST = _env("CF_WS_HOST", "ams.wingsvpn.shop")
+# С РФ прямой IP AMS режется на TLS (TCP есть, 0 байт). Клиентам — CF anycast.
+CF_WS_HOST = _env("CF_WS_HOST", "cf.wingsvpn.shop")
 CF_WS_PORT = int(_env("CF_WS_PORT", "443"))
 CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
@@ -2052,14 +2051,13 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Happ iOS кэширует сервера по имени — старые «Нидерланды» остаются Reality
-    # (с РФ SNI пустой → xray :10443, 30с тишина). Новые remarks + Safari TLS.
-    # Origin XHTTP через nginx 1.24 не поднимается (h2 backend), поэтому только WS.
+    # AMS IP с РФ: TCP есть, TLS 0 байт (TSPU). Ultima NL — другой IP (ios.appl.ltd).
+    # Все профили — Cloudflare anycast, иначе телефон ходит на засвеченный IP.
+    # Новые remarks, чтобы iOS не держал старый Reality.
     ws_nl = "🇳🇱 Нидерланды · сайт"
     turbo_name = "🚀 Турбо · сайт"
     hy_name = "🇪🇺 Hysteria · сайт"
     cf_name = "☁️ Cloudflare · сайт"
-    cf_orange = _env("CF_ORANGE_HOST", "cf.wingsvpn.shop")
     profiles: list[dict[str, Any]] = [
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=ws_nl
@@ -2071,12 +2069,7 @@ def build_happ_json_subscription(
             uuid, country, user_id=user_id, display_name=hy_name
         ),
         build_cloudflare_ws_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=cf_orange,
-            sni=cf_orange,
-            display_name=cf_name,
+            uuid, country, user_id=user_id, display_name=cf_name
         ),
     ]
     return profiles

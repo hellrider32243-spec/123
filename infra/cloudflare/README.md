@@ -14,6 +14,8 @@ Two WS paths share the same Xray inbound (`127.0.0.1:8880`, path `/cfws`):
    already works from Russia for subscription fetch (grey DNS, Let's Encrypt).
    nginx stream sends that SNI to `:8080`, which upgrades `/cfws` to Xray.
    Reality on the same IP is DPI'd; this looks like the working HTTPS site.
+   RU mobile often presents **empty SNI** (ECH or TSPU). Stream `default` is
+   nginx `:8080`, not Reality — otherwise those sessions stall with 0 bytes.
 2. **Cloudflare anycast (fallback profile)** — SNI `cf.wingsvpn.shop` via Tunnel.
    Useful if the origin IP is fully blocked; some RU mobile networks never
    complete the tunnel handshake from the phone.
