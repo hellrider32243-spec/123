@@ -79,14 +79,14 @@ AMS_PORT = int(_env("AMS_PORT", "443"))
 AMS_PBK = _env("AMS_PBK", "")
 AMS_SID = _env("AMS_SID", REALITY_SID)
 AMS_SID2 = _env("AMS_SID2", AMS_SID)
-AMS_SNI = _env("AMS_SNI", "www.apple.com")
+AMS_SNI = _env("AMS_SNI", "deepl.com")
 AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
 AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
 PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
 # gRPC Reality #1 — основной профиль Ultima «Нидерланды»
 AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
 AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49713"))
-AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "apple.com")
+AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "deepl.com")
 AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
 AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
 PROFILE_AMS_GRPC = _env("VPN_PROFILE_AMS_GRPC", "🇳🇱 Нидерланды")
@@ -1952,9 +1952,11 @@ def build_amsterdam_grpc_config(
         fingerprint=fingerprint or AMS_GRPC_FP or "firefox",
         with_fragment=True,
     )
-    # Ultima: mode=false, без multiMode
-    outbound["streamSettings"]["grpcSettings"]["multiMode"] = False
-    outbound["streamSettings"]["grpcSettings"]["mode"] = False
+    # Ultima: serviceName + authority + mode=false, без multiMode
+    grpc = outbound["streamSettings"]["grpcSettings"]
+    grpc.pop("multiMode", None)
+    grpc["mode"] = False
+    grpc["authority"] = grpc.get("authority") or ""
     return _base_config(
         remark,
         outbound,
@@ -2032,21 +2034,52 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Happ держит выбранный remarks. Прямой AMS Reality из РФ не поднимается
-    # (Apple SNI), поэтому те же имена профилей отдают Cloudflare WS.
+    # Как Ultima: gRPC/TCP Reality + SNI deepl.com + fragment. Apple SNI в РФ мёртв.
+    # Cloudflare — запасной путь, если прямой IP режут.
     turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
-    profiles: list[dict[str, Any]] = [
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=turbo_name
-        ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=PROFILE_AMS_GRPC
-        ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=PROFILE_AMS_HYSTERIA
-        ),
-        build_cloudflare_ws_config(uuid, country, user_id=user_id),
-    ]
+    profiles: list[dict[str, Any]] = []
+    if AMS_HOST and AMS_PBK:
+        profiles.append(
+            build_amsterdam_reality_config(
+                uuid,
+                country,
+                user_id=user_id,
+                display_name=turbo_name,
+                with_fragment=True,
+                server_description="⚡ TCP Reality · SNI deepl.com · fragment",
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC_HOST or AMS_HOST,
+                port=AMS_GRPC_PORT,
+                sni=AMS_GRPC_SNI,
+                sid=AMS_SID,
+                service_name=AMS_GRPC_SERVICE,
+                fingerprint=AMS_GRPC_FP,
+                display_name=PROFILE_AMS_GRPC,
+                server_description="VLESS | gRPC | Reality | deepl.com",
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC2_HOST or AMS_HOST,
+                port=AMS_GRPC2_PORT,
+                sni=AMS_GRPC2_SNI,
+                sid=AMS_SID2,
+                service_name=AMS_GRPC2_SERVICE,
+                fingerprint=AMS_GRPC2_FP,
+                display_name=PROFILE_AMS_HYSTERIA,
+                server_description="Hysteria",
+            )
+        )
+    profiles.append(build_cloudflare_ws_config(uuid, country, user_id=user_id))
     return profiles
 
 
