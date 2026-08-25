@@ -133,7 +133,7 @@ def _telegram_direct_domains() -> list[str]:
 
 
 def _telegram_direct_ips() -> list[str]:
-    """Официальные DC/IP-диапазоны Telegram → direct (только IPv4: DNS UseIPv4)."""
+    """IPv4 DC Telegram. Через VPN (4VPS достукивается; Happ TUN + direct на iOS ломает TG)."""
     return [
         "91.108.4.0/22",
         "91.108.8.0/22",
@@ -144,22 +144,37 @@ def _telegram_direct_ips() -> list[str]:
         "91.105.192.0/23",
         "149.154.160.0/20",
         "185.76.151.0/24",
-        # AS62041 Telegram (NL) — Happ шлёт IP без SNI, домены не срабатывают.
-        # Не использовать geoip:telegram: в Happ iOS geoip.dat нет секции TELEGRAM,
-        # ядро падает с «отсутствует секция TELEGRAM».
+        # AS62041 — Happ часто шлёт голый IP без SNI.
         "95.161.64.0/19",
     ]
 
 
+def _telegram_ipv6() -> list[str]:
+    """IPv6 Telegram → direct: на 4VPS IPv6 выключен, через туннель IPv6 не выйдет."""
+    return [
+        "2001:b28:f23d::/48",
+        "2001:b28:f23f::/48",
+        "2001:67c:4e8::/48",
+        "2001:b28:f23c::/48",
+        "2a0a:f280::/32",
+    ]
+
+
 def _telegram_direct_rules() -> list[dict[str, Any]]:
+    # Не geoip:telegram — в Happ iOS нет секции TELEGRAM, ядро не стартует.
     return [
         {
             "domain": _telegram_direct_domains(),
-            "outboundTag": "direct",
+            "outboundTag": "proxy",
             "type": "field",
         },
         {
             "ip": _telegram_direct_ips(),
+            "outboundTag": "proxy",
+            "type": "field",
+        },
+        {
+            "ip": _telegram_ipv6(),
             "outboundTag": "direct",
             "type": "field",
         },
@@ -254,8 +269,8 @@ def get_traffic_bytes(email: str) -> tuple[int, int]:
 
 def _ultima_routing_rules() -> dict[str, Any]:
     """Ultima: .ru direct, YouTube/остальное через VPN.
-    Telegram всегда direct: через AMS/CF (датацентр) Telegram часто не открывается,
-    а в РФ он и так ходит напрямую — иначе при мёртвом туннеле «не грузится Telegram»."""
+    Telegram IPv4 — через 4VPS (там TG открывается; Cloudzy AMS — нет).
+    IPv6 Telegram — direct: у VPS нет IPv6."""
     return {
         "domainMatcher": "hybrid",
         "domainStrategy": "IPIfNonMatch",
