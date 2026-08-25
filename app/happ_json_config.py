@@ -165,12 +165,12 @@ def _telegram_direct_rules() -> list[dict[str, Any]]:
     return [
         {
             "domain": _telegram_direct_domains(),
-            "outboundTag": "proxy",
+            "outboundTag": "tg",
             "type": "field",
         },
         {
             "ip": _telegram_direct_ips(),
-            "outboundTag": "proxy",
+            "outboundTag": "tg",
             "type": "field",
         },
         {
@@ -1126,6 +1126,13 @@ def _happ_meta(
     return meta
 
 
+def _outbound_uuid(outbound: dict[str, Any]) -> str:
+    try:
+        return str(outbound["settings"]["vnext"][0]["users"][0]["id"] or "")
+    except Exception:
+        return ""
+
+
 def _base_config(
     remark: str,
     proxy_outbound: dict[str, Any],
@@ -1136,15 +1143,22 @@ def _base_config(
     dns_servers: Optional[list[str]] = None,
     route_only: bool = False,
 ) -> dict[str, Any]:
+    outbounds: list[dict[str, Any]] = [proxy_outbound]
+    uid = _outbound_uuid(proxy_outbound)
+    if uid and AMS_HOST and AMS_PBK:
+        # Telegram всегда через TCP :443 без fragment — даже если выбран gRPC-профиль.
+        outbounds.append(_telegram_fast_outbound(uid))
+    outbounds.extend(
+        [
+            {"protocol": "freedom", "tag": "direct"},
+            {"protocol": "blackhole", "tag": "block"},
+        ]
+    )
     return {
         "dns": dns or {"queryStrategy": "UseIP", "servers": dns_servers or ["8.8.8.8", "8.8.4.4"]},
         "inbounds": _client_inbounds(route_only=route_only),
         "log": {"loglevel": "error"},
-        "outbounds": [
-            proxy_outbound,
-            {"protocol": "freedom", "tag": "direct"},
-            {"protocol": "blackhole", "tag": "block"},
-        ],
+        "outbounds": outbounds,
         "remarks": remark,
         "meta": meta or _happ_meta(),
         "routing": routing or _routing_rules(),
@@ -1167,6 +1181,11 @@ def _balancer_config(
         "log": {"loglevel": "error"},
         "outbounds": [
             *proxy_outbounds,
+            *(
+                [_telegram_fast_outbound(_outbound_uuid(proxy_outbounds[0]))]
+                if proxy_outbounds and _outbound_uuid(proxy_outbounds[0]) and AMS_HOST and AMS_PBK
+                else []
+            ),
             {"protocol": "freedom", "tag": "direct"},
             {"protocol": "blackhole", "tag": "block"},
         ],
@@ -1434,6 +1453,22 @@ def _tcp_outbound(
     if with_fragment:
         _apply_fragment(outbound)
     return outbound
+
+
+def _telegram_fast_outbound(client_uuid: str) -> dict[str, Any]:
+    """Отдельный канал для Telegram: TCP Reality :443 без fragment."""
+    return _tcp_outbound(
+        client_uuid,
+        host=AMS_HOST,
+        port=AMS_PORT,
+        sni=AMS_SNI,
+        pbk=AMS_PBK,
+        sid=AMS_SID,
+        fingerprint=AMS_FP or "qq",
+        flow=AMS_FLOW,
+        with_fragment=False,
+        tag="tg",
+    )
 
 
 def _hysteria2_outbound(
