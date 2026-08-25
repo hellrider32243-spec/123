@@ -2056,43 +2056,20 @@ def build_happ_json_subscription(
     turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
     # С РФ Reality на AMS IP рвётся (TCP есть, сессии в Xray нет — YouTube/Telegram
     # висят в TUN). Турбо = Cloudflare WS; Telegram уходит direct.
+    # У Ultima «Нидерланды» — другой IP (ios.appl.ltd → 89.105.199.216:49714).
+    # Наш 107.189.22.142:49713 в РФ рвут. Пока нет чистого IP, то же имя = CF WS.
     profiles: list[dict[str, Any]] = [
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=turbo_name
         ),
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=PROFILE_AMS_GRPC
+        ),
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=PROFILE_AMS_HYSTERIA
+        ),
+        build_cloudflare_ws_config(uuid, country, user_id=user_id),
     ]
-    if AMS_HOST and AMS_PBK:
-        profiles.append(
-            build_amsterdam_grpc_config(
-                uuid,
-                country,
-                user_id=user_id,
-                host=AMS_GRPC_HOST or AMS_HOST,
-                port=AMS_GRPC_PORT,
-                sni=AMS_GRPC_SNI,
-                sid=AMS_SID,
-                service_name=AMS_GRPC_SERVICE,
-                fingerprint=AMS_GRPC_FP,
-                display_name=PROFILE_AMS_GRPC,
-                server_description="VLESS | gRPC | Reality | deepl.com",
-            )
-        )
-        profiles.append(
-            build_amsterdam_grpc_config(
-                uuid,
-                country,
-                user_id=user_id,
-                host=AMS_GRPC2_HOST or AMS_HOST,
-                port=AMS_GRPC2_PORT,
-                sni=AMS_GRPC2_SNI,
-                sid=AMS_SID2,
-                service_name=AMS_GRPC2_SERVICE,
-                fingerprint=AMS_GRPC2_FP,
-                display_name=PROFILE_AMS_HYSTERIA,
-                server_description="Hysteria",
-            )
-        )
-    profiles.append(build_cloudflare_ws_config(uuid, country, user_id=user_id))
     return profiles
 
 
