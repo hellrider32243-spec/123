@@ -1187,7 +1187,6 @@ def _grpc_outbound(
             "grpcSettings": {
                 "authority": "",
                 "mode": False,
-                "multiMode": GRPC_CLIENT_MULTIMODE,
                 "serviceName": service_name,
             },
             "network": "grpc",
@@ -2039,16 +2038,8 @@ def build_happ_json_subscription(
     turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
     profiles: list[dict[str, Any]] = []
     if AMS_HOST and AMS_PBK:
-        profiles.append(
-            build_amsterdam_reality_config(
-                uuid,
-                country,
-                user_id=user_id,
-                display_name=turbo_name,
-                with_fragment=True,
-                server_description="⚡ TCP Reality · SNI deepl.com · fragment",
-            )
-        )
+        # Турбо = как Ultima «Нидерланды»: gRPC на высоком порту, не TCP :443
+        # (у нас :443 идёт через nginx stream + PROXY protocol — в РФ handshake рвётся).
         profiles.append(
             build_amsterdam_grpc_config(
                 uuid,
@@ -2060,6 +2051,21 @@ def build_happ_json_subscription(
                 sid=AMS_SID,
                 service_name=AMS_GRPC_SERVICE,
                 fingerprint=AMS_GRPC_FP,
+                display_name=turbo_name,
+                server_description="VLESS | gRPC | Reality | deepl.com | fragment",
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC2_HOST or AMS_HOST,
+                port=AMS_GRPC2_PORT,
+                sni=AMS_GRPC2_SNI,
+                sid=AMS_SID2,
+                service_name=AMS_GRPC2_SERVICE,
+                fingerprint=AMS_GRPC2_FP,
                 display_name=PROFILE_AMS_GRPC,
                 server_description="VLESS | gRPC | Reality | deepl.com",
             )
