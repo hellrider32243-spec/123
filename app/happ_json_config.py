@@ -2072,10 +2072,10 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # 4VPS nLighten (чистый IP, не Cloudzy). Новые remarks — iOS кэширует по имени.
-    nl_name = "🇳🇱 Нидерланды · Reality"
-    turbo_name = "🚀 Турбо · Reality"
-    cf_name = "☁️ Cloudflare · сайт"
+    # Как раньше: Турбо / Нидерланды / Hysteria. Самый быстрый (TCP :443) — первым.
+    turbo_name = "🚀 Турбо"
+    nl_name = "🇳🇱 Нидерланды"
+    hy_name = "🇪🇺 Hysteria"
     profiles: list[dict[str, Any]] = [
         build_amsterdam_reality_config(
             uuid,
@@ -2083,17 +2083,26 @@ def build_happ_json_subscription(
             user_id=user_id,
             display_name=turbo_name,
             with_fragment=False,
-            server_description="VLESS | TCP | Reality | 4VPS nLighten :443 · без fragment",
+            server_description="VLESS | TCP | Reality | :443 · самый быстрый",
         ),
         build_amsterdam_grpc_config(
             uuid,
             country,
             user_id=user_id,
             display_name=nl_name,
-            server_description="VLESS | gRPC | Reality | 4VPS nLighten :49714",
+            server_description="VLESS | gRPC | Reality | :49714",
         ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=cf_name
+        build_amsterdam_grpc_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=hy_name,
+            host=AMS_GRPC2_HOST or AMS_HOST,
+            port=AMS_GRPC2_PORT,
+            sni=AMS_GRPC2_SNI,
+            service_name=AMS_GRPC2_SERVICE,
+            fingerprint=AMS_GRPC2_FP or "firefox",
+            server_description="VLESS | gRPC | Reality | :41028 · Hysteria",
         ),
     ]
     return profiles
