@@ -2,10 +2,11 @@
 
 ## Why
 
-Russian ISPs (especially mobile carriers) block the VPS IP `172.86.68.87` at the
-network/DPI level. From several Russian networks a plain TCP connect to the server
-times out on every port, so the VPN "connects then dies". This is not fixable by
-tweaking Xray/Nginx — the server itself is healthy.
+Russian ISPs (especially mobile carriers) block the origin VPS IPs
+(`172.86.68.87` Frankfurt and `107.189.22.142` Amsterdam) at the network/DPI
+level. Direct Reality to Apple SNI on those IPs often TCP-handshakes then dies
+without an authenticated Xray session. That is not an Xray/Nginx crash — the
+servers are healthy from outside Russia.
 
 The fix routes clients to Cloudflare's anycast IPs (which Russian networks do not
 mass-block) via a Cloudflare Tunnel, using a clean SNI on the customer domain
@@ -27,10 +28,12 @@ Client (Happ)  --TLS/WS :443, SNI=cf.wingsvpn.shop-->  Cloudflare edge (anycast)
 - **`cloudflared-nordwings.service`** — Cloudflare Tunnel `nordwings-cf`. Ingress
   `cf.wingsvpn.shop -> http://127.0.0.1:8880`. Tunnel token stored root-only at
   `/etc/cloudflared/nordwings-token` (NOT in git).
-- **`sync_ws_clients.py`** + **`cf-ws-sync.timer`** — every ~2 min, syncs the WS
-  inbound client list to the union of all client UUIDs across the x-ui inbounds,
-  restarting `cf-ws` only when the set changes. This makes the Cloudflare profile
-  work for every subscriber automatically.
+- **`sync_ws_clients.py`** + **`cf-ws-sync.timer`** — every ~2 min, syncs every
+  cf-ws inbound (WS `:8880` and XHTTP `:8881` if present) to the union of all
+  client UUIDs across the x-ui inbounds, restarting `cf-ws` only when the set
+  changes. This makes the Cloudflare profile work for every subscriber automatically.
+  The timer must be enabled; without it new paying users get a CF profile whose
+  UUID is missing on the tunnel inbound.
 
 ## Cloudflare objects (managed via API)
 

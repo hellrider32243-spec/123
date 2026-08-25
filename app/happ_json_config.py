@@ -72,9 +72,34 @@ CF_WS_PATH = _env("CF_WS_PATH", "/cfws")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "chrome")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
+# === Amsterdam clean-IP — схема как у UltimaVPN ===
+# gRPC Reality на высоких портах + TCP Reality :443 + fragment.
+AMS_HOST = _env("AMS_HOST", "")
+AMS_PORT = int(_env("AMS_PORT", "443"))
+AMS_PBK = _env("AMS_PBK", "")
+AMS_SID = _env("AMS_SID", REALITY_SID)
+AMS_SID2 = _env("AMS_SID2", AMS_SID)
+AMS_SNI = _env("AMS_SNI", "www.apple.com")
+AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
+AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
+PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
+# gRPC Reality #1 — основной профиль Ultima «Нидерланды»
+AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
+AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49713"))
+AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "apple.com")
+AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
+AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
+PROFILE_AMS_GRPC = _env("VPN_PROFILE_AMS_GRPC", "🇳🇱 Нидерланды")
+# gRPC Reality #2 — у Ultima называется «Hysteria» (это не hy2, а gRPC+Reality)
+AMS_GRPC2_HOST = _env("AMS_GRPC2_HOST", AMS_HOST)
+AMS_GRPC2_PORT = int(_env("AMS_GRPC2_PORT", "41028"))
+AMS_GRPC2_SNI = _env("AMS_GRPC2_SNI", "deepl.com")
+AMS_GRPC2_SERVICE = _env("AMS_GRPC2_SERVICE", "deepl")
+AMS_GRPC2_FP = _env("AMS_GRPC2_FP", "firefox")
+PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇪🇺 Hysteria")
 PROFILE_TITLE = _env("VPN_PROFILE_NAME", "TritonVPN")
 COUNTRY_LABEL = _env("VPN_COUNTRY_LABEL", "🇩🇪 Германия")
-VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "2") or "2"))
+VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "3") or "3"))
 BOT_USERNAME = _env("BOT_USERNAME", _env("BOT_LINK", "nordwingsvpn_bot").split("/")[-1] or "nordwingsvpn_bot")
 BOT_TELEGRAM_URL = _env("BOT_TELEGRAM_URL", f"https://t.me/{BOT_USERNAME}")
 XUI_DB_PATH = _env("XUI_DB_PATH", "/etc/x-ui/x-ui.db")
@@ -1364,7 +1389,10 @@ def _tcp_outbound(
         },
         "tag": tag,
     }
-    # Fragment на TCP Reality через nginx stream ломает SNI-preread → после connect интернет умирает.
+    # Ultima включает fragment и на TCP Reality. На Amsterdam default nginx → Reality,
+    # поэтому даже при «сломанном» SNI-preread трафик всё равно попадает в Xray.
+    if with_fragment:
+        _apply_fragment(outbound)
     return outbound
 
 
@@ -1851,6 +1879,92 @@ def build_cloudflare_ws_config(
     )
 
 
+def build_amsterdam_reality_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    sni: Optional[str] = None,
+    pbk: Optional[str] = None,
+    sid: Optional[str] = None,
+    fingerprint: Optional[str] = None,
+    flow: Optional[str] = None,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    with_fragment: bool = True,
+    server_description: str = "VLESS | TCP | Reality | :443",
+    **_: Any,
+) -> dict[str, Any]:
+    """VLESS + TCP + Reality (xtls-rprx-vision) :443 — самый быстрый профиль Amsterdam."""
+    remark = display_name or PROFILE_AMS
+    outbound = _tcp_outbound(
+        client_uuid,
+        host=host or AMS_HOST,
+        port=int(port or AMS_PORT),
+        sni=sni or AMS_SNI,
+        pbk=pbk or AMS_PBK,
+        sid=sid or AMS_SID,
+        fingerprint=fingerprint or AMS_FP or "qq",
+        flow=flow or AMS_FLOW,
+        with_fragment=with_fragment,
+    )
+    return _base_config(
+        remark,
+        outbound,
+        meta=_happ_meta(
+            user_id=user_id,
+            extra={"serverDescription": server_description},
+        ),
+        routing=_ultima_routing_rules(),
+        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+    )
+
+
+def build_amsterdam_grpc_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    sni: Optional[str] = None,
+    pbk: Optional[str] = None,
+    sid: Optional[str] = None,
+    service_name: Optional[str] = None,
+    fingerprint: Optional[str] = None,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    server_description: str = "VLESS | gRPC | Reality",
+    **_: Any,
+) -> dict[str, Any]:
+    """VLESS + gRPC + Reality на высоком порту — основной рабочий профиль Ultima."""
+    remark = display_name or PROFILE_AMS_GRPC
+    outbound = _grpc_outbound(
+        client_uuid,
+        host=host or AMS_GRPC_HOST or AMS_HOST,
+        port=int(port or AMS_GRPC_PORT),
+        sni=sni or AMS_GRPC_SNI,
+        pbk=pbk or AMS_PBK,
+        sid=sid or AMS_SID,
+        service_name=service_name or AMS_GRPC_SERVICE,
+        fingerprint=fingerprint or AMS_GRPC_FP or "firefox",
+        with_fragment=True,
+    )
+    # Ultima: mode=false, без multiMode
+    outbound["streamSettings"]["grpcSettings"]["multiMode"] = False
+    outbound["streamSettings"]["grpcSettings"]["mode"] = False
+    return _base_config(
+        remark,
+        outbound,
+        meta=_happ_meta(
+            user_id=user_id,
+            extra={"serverDescription": server_description},
+        ),
+        routing=_ultima_routing_rules(),
+        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+    )
+
+
 def build_whitelist_lte_config(
     client_uuid: str,
     base_remark: str = COUNTRY_LABEL,
@@ -1916,73 +2030,56 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    common = {
-        "sni": p.get("sni") or None,
-        "pbk": p.get("pbk") or None,
-        "sid": p.get("sid") or None,
-        "fingerprint": p.get("fp") or None,
-        "user_id": user_id,
-    }
-    profiles = [
-        # 0) Cloudflare WS (proxied) — обход блокировки IP сервера в РФ. Первый = приоритетный.
+    # РФ режет прямой Reality на AMS (Apple SNI / IP). Cloudflare — рабочий обход.
+    #   0) ☁️ Cloudflare             — VLESS+WS+TLS через anycast CF (первый = приоритет Happ)
+    #   1) 🇳🇱 Нидерланды — 🚀 Турбо — TCP Reality :443 vision/qq, без fragment
+    #   2) 🇳🇱 Нидерланды            — gRPC Reality :49713
+    #   3) 🇪🇺 Hysteria               — gRPC Reality :41028
+    profiles: list[dict[str, Any]] = [
         build_cloudflare_ws_config(uuid, country, user_id=user_id),
-        # 1) TCP Reality :443 (белые списки / hh.ru) — без fragment (nginx ssl_preread)
-        build_auto_balancer_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            sni=common.get("sni") or REALITY_SNI,
-            grpc_fingerprint=common.get("fingerprint"),
-        ),
-        # 2) XHTTP :8445 — запасной LTE-обход (не за nginx preread)
-        build_xhttp_lte_config(uuid, country, user_id=user_id, host=XHTTP_PUBLIC_HOST),
-        build_whitelist_lte_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-        ),
-        build_hysteria_lte_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=HYSTERIA_PUBLIC_HOST,
-        ),
-        build_grpc_turbo_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            sni=common.get("sni") or REALITY_SNI,
-        ),
-        build_grpc_fast_config(uuid, country, **common),
-        build_grpc_antiblock_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-        ),
-        build_youtube_config(
-            uuid,
-            country,
-            user_id=user_id,
-            host=PUBLIC_HOST,
-            pbk=common.get("pbk"),
-            sid=common.get("sid"),
-            # TCP :443 Reality — только hh.ru (не SNI из gRPC vless)
-            sni=None,
-            fingerprint=common.get("fingerprint"),
-        ),
     ]
+    if AMS_HOST and AMS_PBK:
+        turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
+        profiles.append(
+            build_amsterdam_reality_config(
+                uuid,
+                country,
+                user_id=user_id,
+                display_name=turbo_name,
+                with_fragment=False,
+                server_description="⚡ Быстрый · TCP Reality · без fragment",
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC_HOST or AMS_HOST,
+                port=AMS_GRPC_PORT,
+                sni=AMS_GRPC_SNI,
+                sid=AMS_SID,
+                service_name=AMS_GRPC_SERVICE,
+                fingerprint=AMS_GRPC_FP,
+                display_name=PROFILE_AMS_GRPC,
+                server_description="VLESS | gRPC | Reality",
+            )
+        )
+        profiles.append(
+            build_amsterdam_grpc_config(
+                uuid,
+                country,
+                user_id=user_id,
+                host=AMS_GRPC2_HOST or AMS_HOST,
+                port=AMS_GRPC2_PORT,
+                sni=AMS_GRPC2_SNI,
+                sid=AMS_SID2,
+                service_name=AMS_GRPC2_SERVICE,
+                fingerprint=AMS_GRPC2_FP,
+                display_name=PROFILE_AMS_HYSTERIA,
+                server_description="Hysteria",
+            )
+        )
     return profiles
 
 
