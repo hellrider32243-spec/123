@@ -142,6 +142,9 @@ def _telegram_direct_ips() -> list[str]:
         "91.108.56.0/22",
         "149.154.160.0/20",
         "185.76.151.0/24",
+        # AS62041 Telegram (NL) — Happ шлёт IP без SNI, домены не срабатывают
+        "95.161.64.0/19",
+        "geoip:telegram",
     ]
 
 
