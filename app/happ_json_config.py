@@ -1323,6 +1323,7 @@ def _ws_outbound(
 ) -> dict[str, Any]:
     """VLESS + WebSocket + TLS. Через Cloudflare (proxied) клиент коннектится к IP CF,
     поэтому блокировка IP сервера в РФ не срабатывает. SNI = чистый домен cf.*."""
+    user: dict[str, Any] = {"encryption": "none", "id": client_uuid}
     return {
         "protocol": "vless",
         "settings": {
@@ -1330,7 +1331,7 @@ def _ws_outbound(
                 {
                     "address": host,
                     "port": port,
-                    "users": [{"encryption": "none", "flow": "", "id": client_uuid}],
+                    "users": [user],
                 }
             ]
         },
@@ -1344,6 +1345,7 @@ def _ws_outbound(
             },
             "wsSettings": {
                 "path": path,
+                "host": host,
                 "headers": {"Host": host},
             },
         },
@@ -1875,7 +1877,7 @@ def build_cloudflare_ws_config(
             extra={"serverDescription": "☁️ Cloudflare · обход блокировок · стабильно на мобильных"},
         ),
         routing=_ultima_routing_rules(),
-        dns_servers=["8.8.8.8", "8.8.4.4"],
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -2030,56 +2032,21 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # РФ режет прямой Reality на AMS (Apple SNI / IP). Cloudflare — рабочий обход.
-    #   0) ☁️ Cloudflare             — VLESS+WS+TLS через anycast CF (первый = приоритет Happ)
-    #   1) 🇳🇱 Нидерланды — 🚀 Турбо — TCP Reality :443 vision/qq, без fragment
-    #   2) 🇳🇱 Нидерланды            — gRPC Reality :49713
-    #   3) 🇪🇺 Hysteria               — gRPC Reality :41028
+    # Happ держит выбранный remarks. Прямой AMS Reality из РФ не поднимается
+    # (Apple SNI), поэтому те же имена профилей отдают Cloudflare WS.
+    turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
     profiles: list[dict[str, Any]] = [
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=turbo_name
+        ),
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=PROFILE_AMS_GRPC
+        ),
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=PROFILE_AMS_HYSTERIA
+        ),
         build_cloudflare_ws_config(uuid, country, user_id=user_id),
     ]
-    if AMS_HOST and AMS_PBK:
-        turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
-        profiles.append(
-            build_amsterdam_reality_config(
-                uuid,
-                country,
-                user_id=user_id,
-                display_name=turbo_name,
-                with_fragment=False,
-                server_description="⚡ Быстрый · TCP Reality · без fragment",
-            )
-        )
-        profiles.append(
-            build_amsterdam_grpc_config(
-                uuid,
-                country,
-                user_id=user_id,
-                host=AMS_GRPC_HOST or AMS_HOST,
-                port=AMS_GRPC_PORT,
-                sni=AMS_GRPC_SNI,
-                sid=AMS_SID,
-                service_name=AMS_GRPC_SERVICE,
-                fingerprint=AMS_GRPC_FP,
-                display_name=PROFILE_AMS_GRPC,
-                server_description="VLESS | gRPC | Reality",
-            )
-        )
-        profiles.append(
-            build_amsterdam_grpc_config(
-                uuid,
-                country,
-                user_id=user_id,
-                host=AMS_GRPC2_HOST or AMS_HOST,
-                port=AMS_GRPC2_PORT,
-                sni=AMS_GRPC2_SNI,
-                sid=AMS_SID2,
-                service_name=AMS_GRPC2_SERVICE,
-                fingerprint=AMS_GRPC2_FP,
-                display_name=PROFILE_AMS_HYSTERIA,
-                server_description="Hysteria",
-            )
-        )
     return profiles
 
 
