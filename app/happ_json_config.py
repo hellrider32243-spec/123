@@ -247,13 +247,31 @@ def get_traffic_bytes(email: str) -> tuple[int, int]:
 
 
 def _ultima_routing_rules() -> dict[str, Any]:
-    """Точная схема UltimaVPN: .ru direct, остальное (default outbound) через VPN."""
+    """Ultima: .ru direct, YouTube/остальное через VPN.
+    Telegram всегда direct: через AMS/CF (датацентр) Telegram часто не открывается,
+    а в РФ он и так ходит напрямую — иначе при мёртвом туннеле «не грузится Telegram»."""
     return {
         "domainMatcher": "hybrid",
         "domainStrategy": "IPIfNonMatch",
         "rules": [
             {"type": "field", "domain": ["oneme.ru", "max.ru"], "outboundTag": "block"},
             {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
+            *_telegram_direct_rules(),
+            {
+                "type": "field",
+                "domain": [
+                    "domain:youtube.com",
+                    "domain:youtu.be",
+                    "domain:ytimg.com",
+                    "domain:ggpht.com",
+                    "domain:googlevideo.com",
+                    "domain:youtubei.googleapis.com",
+                    "domain:youtube.googleapis.com",
+                    "domain:youtubekids.com",
+                    "domain:youtube-nocookie.com",
+                ],
+                "outboundTag": "proxy",
+            },
             {
                 "type": "field",
                 "domain": [
@@ -2036,10 +2054,14 @@ def build_happ_json_subscription(
     # Как Ultima: gRPC/TCP Reality + SNI deepl.com + fragment. Apple SNI в РФ мёртв.
     # Cloudflare — запасной путь, если прямой IP режут.
     turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
-    profiles: list[dict[str, Any]] = []
+    # С РФ Reality на AMS IP рвётся (TCP есть, сессии в Xray нет — YouTube/Telegram
+    # висят в TUN). Турбо = Cloudflare WS; Telegram уходит direct.
+    profiles: list[dict[str, Any]] = [
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=turbo_name
+        ),
+    ]
     if AMS_HOST and AMS_PBK:
-        # Турбо = как Ultima «Нидерланды»: gRPC на высоком порту, не TCP :443
-        # (у нас :443 идёт через nginx stream + PROXY protocol — в РФ handshake рвётся).
         profiles.append(
             build_amsterdam_grpc_config(
                 uuid,
@@ -2051,21 +2073,6 @@ def build_happ_json_subscription(
                 sid=AMS_SID,
                 service_name=AMS_GRPC_SERVICE,
                 fingerprint=AMS_GRPC_FP,
-                display_name=turbo_name,
-                server_description="VLESS | gRPC | Reality | deepl.com | fragment",
-            )
-        )
-        profiles.append(
-            build_amsterdam_grpc_config(
-                uuid,
-                country,
-                user_id=user_id,
-                host=AMS_GRPC2_HOST or AMS_HOST,
-                port=AMS_GRPC2_PORT,
-                sni=AMS_GRPC2_SNI,
-                sid=AMS_SID2,
-                service_name=AMS_GRPC2_SERVICE,
-                fingerprint=AMS_GRPC2_FP,
                 display_name=PROFILE_AMS_GRPC,
                 server_description="VLESS | gRPC | Reality | deepl.com",
             )
