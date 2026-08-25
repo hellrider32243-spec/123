@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync active NordWings keys to 4VPS nLighten x-ui
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/nordwings/app
+EnvironmentFile=-/opt/nordwings/app/.nl-xui.env
+ExecStart=/opt/nordwings/app/venv/bin/python /opt/nordwings/app/sync_nl_4vps_clients.py
+Nice=10

@@ -72,12 +72,13 @@ CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
 CF_WS_FP = _env("CF_WS_FP", "safari")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
-# === Amsterdam clean-IP — схема как у UltimaVPN ===
-# gRPC Reality на высоких портах + TCP Reality :443 + fragment.
-AMS_HOST = _env("AMS_HOST", "")
+# === Amsterdam clean-IP (4VPS nLighten) — схема как у UltimaVPN ===
+# gRPC Reality на высоком порту + TCP Reality :443 + fragment.
+# Публичный ключ можно держать в репо; privateKey только на VPS.
+AMS_HOST = _env("AMS_HOST", "139.28.240.160")
 AMS_PORT = int(_env("AMS_PORT", "443"))
-AMS_PBK = _env("AMS_PBK", "")
-AMS_SID = _env("AMS_SID", REALITY_SID)
+AMS_PBK = _env("AMS_PBK", "-IYnX45q6qyRMrl_bTLLeW97TCBdZW0aTNu7WBF4Nm0")
+AMS_SID = _env("AMS_SID", "a7c31e04")
 AMS_SID2 = _env("AMS_SID2", AMS_SID)
 AMS_SNI = _env("AMS_SNI", "deepl.com")
 AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
@@ -85,7 +86,7 @@ AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
 PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
 # gRPC Reality #1 — основной профиль Ultima «Нидерланды»
 AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
-AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49713"))
+AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49714"))
 AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "deepl.com")
 AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
 AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
@@ -132,7 +133,7 @@ def _telegram_direct_domains() -> list[str]:
 
 
 def _telegram_direct_ips() -> list[str]:
-    """Официальные DC/IP-диапазоны Telegram → direct (только IPv4: DNS UseIPv4)."""
+    """IPv4 DC Telegram. Через VPN (4VPS достукивается; Happ TUN + direct на iOS ломает TG)."""
     return [
         "91.108.4.0/22",
         "91.108.8.0/22",
@@ -140,23 +141,40 @@ def _telegram_direct_ips() -> list[str]:
         "91.108.16.0/22",
         "91.108.20.0/22",
         "91.108.56.0/22",
+        "91.105.192.0/23",
         "149.154.160.0/20",
         "185.76.151.0/24",
-        # AS62041 Telegram (NL) — Happ шлёт IP без SNI, домены не срабатывают
+        # AS62041 — Happ часто шлёт голый IP без SNI.
         "95.161.64.0/19",
-        "geoip:telegram",
+    ]
+
+
+def _telegram_ipv6() -> list[str]:
+    """IPv6 Telegram → direct: на 4VPS IPv6 выключен, через туннель IPv6 не выйдет."""
+    return [
+        "2001:b28:f23d::/48",
+        "2001:b28:f23f::/48",
+        "2001:67c:4e8::/48",
+        "2001:b28:f23c::/48",
+        "2a0a:f280::/32",
     ]
 
 
 def _telegram_direct_rules() -> list[dict[str, Any]]:
+    # Не geoip:telegram — в Happ iOS нет секции TELEGRAM, ядро не стартует.
     return [
         {
             "domain": _telegram_direct_domains(),
-            "outboundTag": "direct",
+            "outboundTag": "tg",
             "type": "field",
         },
         {
             "ip": _telegram_direct_ips(),
+            "outboundTag": "tg",
+            "type": "field",
+        },
+        {
+            "ip": _telegram_ipv6(),
             "outboundTag": "direct",
             "type": "field",
         },
@@ -251,8 +269,8 @@ def get_traffic_bytes(email: str) -> tuple[int, int]:
 
 def _ultima_routing_rules() -> dict[str, Any]:
     """Ultima: .ru direct, YouTube/остальное через VPN.
-    Telegram всегда direct: через AMS/CF (датацентр) Telegram часто не открывается,
-    а в РФ он и так ходит напрямую — иначе при мёртвом туннеле «не грузится Telegram»."""
+    Telegram IPv4 — через 4VPS (там TG открывается; Cloudzy AMS — нет).
+    IPv6 Telegram — direct: у VPS нет IPv6."""
     return {
         "domainMatcher": "hybrid",
         "domainStrategy": "IPIfNonMatch",
@@ -1108,6 +1126,13 @@ def _happ_meta(
     return meta
 
 
+def _outbound_uuid(outbound: dict[str, Any]) -> str:
+    try:
+        return str(outbound["settings"]["vnext"][0]["users"][0]["id"] or "")
+    except Exception:
+        return ""
+
+
 def _base_config(
     remark: str,
     proxy_outbound: dict[str, Any],
@@ -1118,15 +1143,22 @@ def _base_config(
     dns_servers: Optional[list[str]] = None,
     route_only: bool = False,
 ) -> dict[str, Any]:
+    outbounds: list[dict[str, Any]] = [proxy_outbound]
+    uid = _outbound_uuid(proxy_outbound)
+    if uid and AMS_HOST and AMS_PBK:
+        # Telegram всегда через TCP :443 без fragment — даже если выбран gRPC-профиль.
+        outbounds.append(_telegram_fast_outbound(uid))
+    outbounds.extend(
+        [
+            {"protocol": "freedom", "tag": "direct"},
+            {"protocol": "blackhole", "tag": "block"},
+        ]
+    )
     return {
         "dns": dns or {"queryStrategy": "UseIP", "servers": dns_servers or ["8.8.8.8", "8.8.4.4"]},
         "inbounds": _client_inbounds(route_only=route_only),
         "log": {"loglevel": "error"},
-        "outbounds": [
-            proxy_outbound,
-            {"protocol": "freedom", "tag": "direct"},
-            {"protocol": "blackhole", "tag": "block"},
-        ],
+        "outbounds": outbounds,
         "remarks": remark,
         "meta": meta or _happ_meta(),
         "routing": routing or _routing_rules(),
@@ -1149,6 +1181,11 @@ def _balancer_config(
         "log": {"loglevel": "error"},
         "outbounds": [
             *proxy_outbounds,
+            *(
+                [_telegram_fast_outbound(_outbound_uuid(proxy_outbounds[0]))]
+                if proxy_outbounds and _outbound_uuid(proxy_outbounds[0]) and AMS_HOST and AMS_PBK
+                else []
+            ),
             {"protocol": "freedom", "tag": "direct"},
             {"protocol": "blackhole", "tag": "block"},
         ],
@@ -1416,6 +1453,22 @@ def _tcp_outbound(
     if with_fragment:
         _apply_fragment(outbound)
     return outbound
+
+
+def _telegram_fast_outbound(client_uuid: str) -> dict[str, Any]:
+    """Отдельный канал для Telegram: TCP Reality :443 без fragment."""
+    return _tcp_outbound(
+        client_uuid,
+        host=AMS_HOST,
+        port=AMS_PORT,
+        sni=AMS_SNI,
+        pbk=AMS_PBK,
+        sid=AMS_SID,
+        fingerprint=AMS_FP or "qq",
+        flow=AMS_FLOW,
+        with_fragment=False,
+        tag="tg",
+    )
 
 
 def _hysteria2_outbound(
@@ -1939,7 +1992,7 @@ def build_amsterdam_reality_config(
             extra={"serverDescription": server_description},
         ),
         routing=_ultima_routing_rules(),
-        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -1985,7 +2038,7 @@ def build_amsterdam_grpc_config(
             extra={"serverDescription": server_description},
         ),
         routing=_ultima_routing_rules(),
-        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -2054,25 +2107,37 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # AMS IP с РФ: TCP есть, TLS 0 байт (TSPU). Ultima NL — другой IP (ios.appl.ltd).
-    # Все профили — Cloudflare anycast, иначе телефон ходит на засвеченный IP.
-    # Новые remarks, чтобы iOS не держал старый Reality.
-    ws_nl = "🇳🇱 Нидерланды · сайт"
-    turbo_name = "🚀 Турбо · сайт"
-    hy_name = "🇪🇺 Hysteria · сайт"
-    cf_name = "☁️ Cloudflare · сайт"
+    # Как раньше: Турбо / Нидерланды / Hysteria. Самый быстрый (TCP :443) — первым.
+    turbo_name = "🚀 Турбо"
+    nl_name = "🇳🇱 Нидерланды"
+    hy_name = "🇪🇺 Hysteria"
     profiles: list[dict[str, Any]] = [
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=ws_nl
+        build_amsterdam_reality_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=turbo_name,
+            with_fragment=False,
+            server_description="VLESS | TCP | Reality | :443 · самый быстрый",
         ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=turbo_name
+        build_amsterdam_grpc_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=nl_name,
+            server_description="VLESS | gRPC | Reality | :49714",
         ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=hy_name
-        ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=cf_name
+        build_amsterdam_grpc_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=hy_name,
+            host=AMS_GRPC2_HOST or AMS_HOST,
+            port=AMS_GRPC2_PORT,
+            sni=AMS_GRPC2_SNI,
+            service_name=AMS_GRPC2_SERVICE,
+            fingerprint=AMS_GRPC2_FP or "firefox",
+            server_description="VLESS | gRPC | Reality | :41028 · Hysteria",
         ),
     ]
     return profiles
