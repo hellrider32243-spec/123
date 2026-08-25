@@ -141,6 +141,7 @@ def _telegram_direct_ips() -> list[str]:
         "91.108.16.0/22",
         "91.108.20.0/22",
         "91.108.56.0/22",
+        "91.105.192.0/23",
         "149.154.160.0/20",
         "185.76.151.0/24",
         # AS62041 Telegram (NL) — Happ шлёт IP без SNI, домены не срабатывают.
@@ -1941,7 +1942,7 @@ def build_amsterdam_reality_config(
             extra={"serverDescription": server_description},
         ),
         routing=_ultima_routing_rules(),
-        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -1987,7 +1988,7 @@ def build_amsterdam_grpc_config(
             extra={"serverDescription": server_description},
         ),
         routing=_ultima_routing_rules(),
-        dns={"queryStrategy": "UseIP", "servers": ["8.8.8.8", "8.8.4.4"]},
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -2061,20 +2062,20 @@ def build_happ_json_subscription(
     turbo_name = "🚀 Турбо · Reality"
     cf_name = "☁️ Cloudflare · сайт"
     profiles: list[dict[str, Any]] = [
+        build_amsterdam_reality_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=turbo_name,
+            with_fragment=False,
+            server_description="VLESS | TCP | Reality | 4VPS nLighten :443 · без fragment",
+        ),
         build_amsterdam_grpc_config(
             uuid,
             country,
             user_id=user_id,
             display_name=nl_name,
             server_description="VLESS | gRPC | Reality | 4VPS nLighten :49714",
-        ),
-        build_amsterdam_reality_config(
-            uuid,
-            country,
-            user_id=user_id,
-            display_name=turbo_name,
-            with_fragment=True,
-            server_description="VLESS | TCP | Reality | 4VPS nLighten :443",
         ),
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=cf_name
