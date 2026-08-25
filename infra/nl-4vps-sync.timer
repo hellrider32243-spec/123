@@ -1,0 +1,11 @@
+[Unit]
+Description=Every minute: sync new VPN keys to 4VPS NL
+
+[Timer]
+OnBootSec=40s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
