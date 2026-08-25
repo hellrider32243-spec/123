@@ -1,0 +1,11 @@
+[Unit]
+Description=Every minute: check watched VPN clients online
+
+[Timer]
+OnBootSec=50s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
