@@ -1,0 +1,7 @@
+[Unit]
+Description=Sync cf-ws Xray client list from x-ui
+After=x-ui.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/nordwings/cf/sync_ws_clients.py

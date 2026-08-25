@@ -1,0 +1,13 @@
+[Unit]
+Description=NordWings cloudflared tunnel
+After=network-online.target cf-ws.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash -c 'exec /usr/local/bin/cloudflared tunnel --no-autoupdate --protocol auto run --token "$(cat /etc/cloudflared/nordwings-token)"'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
