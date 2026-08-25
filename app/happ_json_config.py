@@ -71,7 +71,7 @@ CF_WS_HOST = _env("CF_WS_HOST", "ams.wingsvpn.shop")
 CF_WS_PORT = int(_env("CF_WS_PORT", "443"))
 CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
-CF_WS_FP = _env("CF_WS_FP", "chrome")
+CF_WS_FP = _env("CF_WS_FP", "safari")
 PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
 # === Amsterdam clean-IP — схема как у UltimaVPN ===
 # gRPC Reality на высоких портах + TCP Reality :443 + fragment.
@@ -1854,10 +1854,10 @@ def build_xhttp_lte_config(
         outbound,
         meta=_happ_meta(
             user_id=user_id,
-            extra={"serverDescription": "LTE · Мегафон · 4G · split-tunnel"},
+            extra={"serverDescription": f"VLESS | XHTTP | TLS | {host}"},
         ),
         routing=_ultima_routing_rules(),
-        dns_servers=["8.8.8.8", "8.8.4.4"],
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
     )
 
 
@@ -2052,20 +2052,23 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Reality на AMS IP с РФ не аутентифицируется (TCP есть, сессии в Xray нет).
-    # Подписка HTTPS ams.wingsvpn.shop с РФ открывается — тот же SNI несёт VLESS+WS.
-    # cf.* оставляем четвёртым профилем: anycast, если origin IP всё же режут.
-    turbo_name = PROFILE_TURBO or PROFILE_AMS or "🇳🇱 Нидерланды — 🚀 Турбо"
+    # Happ iOS кэширует сервера по имени — старые «Нидерланды» остаются Reality
+    # (с РФ SNI пустой → xray :10443, 30с тишина). Новые remarks + Safari TLS.
+    # Origin XHTTP через nginx 1.24 не поднимается (h2 backend), поэтому только WS.
+    ws_nl = "🇳🇱 Нидерланды · сайт"
+    turbo_name = "🚀 Турбо · сайт"
+    hy_name = "🇪🇺 Hysteria · сайт"
+    cf_name = "☁️ Cloudflare · сайт"
     cf_orange = _env("CF_ORANGE_HOST", "cf.wingsvpn.shop")
     profiles: list[dict[str, Any]] = [
+        build_cloudflare_ws_config(
+            uuid, country, user_id=user_id, display_name=ws_nl
+        ),
         build_cloudflare_ws_config(
             uuid, country, user_id=user_id, display_name=turbo_name
         ),
         build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=PROFILE_AMS_GRPC
-        ),
-        build_cloudflare_ws_config(
-            uuid, country, user_id=user_id, display_name=PROFILE_AMS_HYSTERIA
+            uuid, country, user_id=user_id, display_name=hy_name
         ),
         build_cloudflare_ws_config(
             uuid,
@@ -2073,6 +2076,7 @@ def build_happ_json_subscription(
             user_id=user_id,
             host=cf_orange,
             sni=cf_orange,
+            display_name=cf_name,
         ),
     ]
     return profiles
