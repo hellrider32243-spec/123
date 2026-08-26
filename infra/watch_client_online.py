@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Пишет админу в Telegram, когда выбранный VPN-клиент появляется онлайн на 4VPS.
+"""Пишет админу в Telegram, когда выбранный VPN-клиент онлайн на 4VPS.
 
-Смотрит lastOnline в x-ui, не Telegram last-seen.
+Смотрит lastOnline и объём up/down в x-ui. Не last-seen Telegram и не сайты.
 """
 from __future__ import annotations
 
@@ -32,6 +32,7 @@ WATCH_USERNAMES = [
 ]
 ADMIN_ID = int(os.getenv("WATCH_ADMIN_ID") or os.getenv("ADMIN_ID") or "858565509")
 ONLINE_WINDOW_SEC = int(os.getenv("WATCH_ONLINE_SEC", "180"))
+TRAFFIC_NOTIFY_BYTES = int(float(os.getenv("WATCH_TRAFFIC_MB", "5")) * 1024 * 1024)
 BOT_TOKEN = os.getenv("BOT_TOKEN") or os.getenv("TG_BOT_TOKEN") or ""
 MSK = timezone(timedelta(hours=3))
 
@@ -164,30 +165,67 @@ def main() -> int:
             flush=True,
         )
 
+        up = int(st.get("up") or 0)
+        down = int(st.get("down") or 0)
+        last_notified_up = int(prev.get("last_notified_up") or -1)
+        last_notified_down = int(prev.get("last_notified_down") or -1)
+        notified_up, notified_down = last_notified_up, last_notified_down
+
         if online and not was_online:
             tg_send(
                 "🟢 <b>Онлайн в VPN</b>\n"
                 f"{who}\n"
                 f"⏰ {msk_fmt(last_ms)}\n"
                 f"📡 {st.get('inbound') or '—'}\n"
-                f"📊 ↑ {mb(st.get('up', 0))}  ↓ {mb(st.get('down', 0))}"
+                f"📊 ↑ {mb(up)}  ↓ {mb(down)}"
             )
+            notified_up, notified_down = up, down
             print(f"notified online {handle}", flush=True)
         elif (not online) and was_online:
             tg_send(
                 "⚪️ <b>Оффлайн</b>\n"
                 f"{who}\n"
                 f"последний раз: {msk_fmt(last_ms)}\n"
-                f"📊 ↑ {mb(st.get('up', 0))}  ↓ {mb(st.get('down', 0))}"
+                f"📊 ↑ {mb(up)}  ↓ {mb(down)}"
             )
+            notified_up, notified_down = up, down
             print(f"notified offline {handle}", flush=True)
+        else:
+            # Объём трафика, без направлений (сайты/приложения не смотрим).
+            delta = 0
+            if last_notified_up < 0:
+                delta = TRAFFIC_NOTIFY_BYTES
+            else:
+                delta = max(0, up - last_notified_up) + max(0, down - last_notified_down)
+            if delta >= TRAFFIC_NOTIFY_BYTES:
+                d_up = up - (last_notified_up if last_notified_up >= 0 else up)
+                d_down = down - (last_notified_down if last_notified_down >= 0 else down)
+                extra = ""
+                if last_notified_up >= 0:
+                    extra = f"\nΔ с прошлого: ↑ {mb(max(0, d_up))}  ↓ {mb(max(0, d_down))}"
+                tg_send(
+                    "📊 <b>Трафик VPN</b>\n"
+                    f"{who}\n"
+                    f"{'🟢 онлайн' if online else '⚪️ оффлайн'} · {msk_fmt(last_ms)}\n"
+                    f"📡 {st.get('inbound') or '—'}\n"
+                    f"всего ↑ {mb(up)}  ↓ {mb(down)}"
+                    f"{extra}"
+                )
+                notified_up, notified_down = up, down
+                print(
+                    f"notified traffic {handle} "
+                    f"{'snapshot' if last_notified_up < 0 else 'delta=' + mb(delta)}",
+                    flush=True,
+                )
 
         users_state[key] = {
             "username": u["username"],
             "was_online": online,
             "last_online_ms": last_ms,
-            "up": int(st.get("up") or 0),
-            "down": int(st.get("down") or 0),
+            "up": up,
+            "down": down,
+            "last_notified_up": notified_up if notified_up >= 0 else up,
+            "last_notified_down": notified_down if notified_down >= 0 else down,
             "inbound": st.get("inbound") or "",
             "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         }
