@@ -21,6 +21,16 @@ That host returns 200 for `/health` and `/miniapp/sub/{id}`.
 `https://wingsvpn.shop` is still orange-cloud to the **dead Frankfurt origin**.
 Until Cloudflare DNS is updated it will keep returning 523.
 
+## Key issuance (4VPS x-ui)
+
+This panel requires CSRF on every mutating API call (`X-CSRF-Token` on the session
+after `GET /panel/` login, then refresh from `GET /panel/panel/`). New keys go
+through `POST /panel/panel/api/clients/bulkCreate` on inbounds `1,2,3`; TCP
+inbound 2 gets `xtls-rprx-vision` via `client_inbounds.flow_override`. Expiry
+extend uses sqlite `clients.expiry_time` because classic `updateClient` is 404.
+
+Do not bind the site to `:443` — that port is VLESS Reality.
+
 ## Cloudflare (one change)
 
 In the `wingsvpn.shop` zone, proxied A/AAAA for `@` and `www`:
