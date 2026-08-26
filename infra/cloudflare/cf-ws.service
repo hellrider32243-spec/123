@@ -1,0 +1,14 @@
+[Unit]
+Description=NordWings Cloudflare WS Xray inbound
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/x-ui/bin/xray-linux-amd64 run -c /opt/nordwings/cf/ws.json
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
