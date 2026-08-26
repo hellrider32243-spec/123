@@ -1,0 +1,12 @@
+[Unit]
+Description=Notify admin when watched VPN clients come online
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/nordwings/app
+EnvironmentFile=-/opt/nordwings/app/.nl-xui.env
+EnvironmentFile=-/opt/nordwings/app/.watch-online.env
+ExecStart=/opt/nordwings/app/venv/bin/python /opt/nordwings/app/watch_client_online.py
+Nice=10
