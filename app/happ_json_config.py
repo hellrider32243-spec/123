@@ -1729,7 +1729,7 @@ def build_grpc_antiblock_config(
     user_id: Optional[int] = None,
     **_: Any,
 ) -> dict[str, Any]:
-    """gRPC :8443 как «Быстрый» — стабильно в Happ iOS; chrome fp для LTE."""
+    """gRPC NL :49714 как «Быстрый» — стабильно в Happ iOS; chrome fp для LTE."""
     remark = display_name or _display_name(PROFILE_ANTIBLOCK, country=_clean_remark(base_remark))
     outbound = _grpc_outbound(
         client_uuid,

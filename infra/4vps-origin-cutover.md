@@ -22,11 +22,17 @@ Do not issue `wingsvpn.shop:8443` / SNI `www.apple.com` / gRPC `log` — that wa
 
 ## HTTPS front
 
-`https://ams.wingsvpn.shop` (grey-cloud to AMS nginx) now proxies to 4VPS `:80`.
+`https://ams.wingsvpn.shop` (grey-cloud to AMS nginx) proxies to 4VPS `:80`.
 That host returns 200 for `/health` and `/miniapp/sub/{id}`.
+Amsterdam nginx already serves `wingsvpn.shop` SNI (LE cert). Loopback check:
+`https://wingsvpn.shop/health` on AMS = 200.
 
-`https://wingsvpn.shop` is still orange-cloud to the **dead Frankfurt origin**.
-Until Cloudflare DNS is updated it will keep returning 523.
+`https://wingsvpn.shop` from the public Internet is still orange-cloud to the
+**dead Frankfurt origin** (`172.86.68.87`) → Cloudflare **523**. Happ 🔄 on
+the apex domain fails until DNS is moved.
+
+All active `bot.db` keys already store `https://ams.wingsvpn.shop/miniapp/sub/{id}`
+and NL Reality vless (`139.28.240.160`, not `:8443` / `www.apple.com`).
 
 ## Key issuance (4VPS x-ui)
 
@@ -43,11 +49,20 @@ Do not bind the site to `:443` — that port is VLESS Reality.
 In the `wingsvpn.shop` zone, proxied A/AAAA for `@` and `www`:
 
 - **from** Frankfurt `172.86.68.87`
-- **to** AMS `107.189.22.142` (has Let's Encrypt for `wingsvpn.shop`, proxies to NL)
+- **to** AMS `107.189.22.142` / `2602:fa59:5:5a8::1`
+  (has Let's Encrypt for `wingsvpn.shop`, proxies to 4VPS `:80`)
 
 SSL mode: Full (strict). Do **not** point orange-cloud at 4VPS `:443` — that port
 is VLESS Reality.
 
-Optional alternative: origin `139.28.240.160` + SSL **Flexible** (HTTP `:80`).
+Leave `ams.wingsvpn.shop` grey-cloud on AMS. Leave `cf.wingsvpn.shop` on the tunnel.
 
-After the A record change, Happ/2RayTun 🔄 against `wingsvpn.shop` should work.
+If `CLOUDFLARE_API_TOKEN` is available:
+
+```
+python3 infra/cloudflare/point_apex_to_ams.py --dry-run
+python3 infra/cloudflare/point_apex_to_ams.py --apply
+```
+
+After the A record change, Happ/2RayTun 🔄 against `wingsvpn.shop` should return
+the same 3 NL profiles as `ams.wingsvpn.shop`.
