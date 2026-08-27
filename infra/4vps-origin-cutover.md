@@ -27,9 +27,8 @@ That host returns 200 for `/health` and `/miniapp/sub/{id}`.
 Amsterdam nginx already serves `wingsvpn.shop` SNI (LE cert). Loopback check:
 `https://wingsvpn.shop/health` on AMS = 200.
 
-`https://wingsvpn.shop` from the public Internet is still orange-cloud to the
-**dead Frankfurt origin** (`172.86.68.87`) → Cloudflare **523**. Happ 🔄 on
-the apex domain fails until DNS is moved.
+`https://wingsvpn.shop` public Internet: Cloudflare orange-cloud now origins to
+Amsterdam (A `@`/`www` = `107.189.22.142`). `/health` and `/miniapp/sub` return 200.
 
 All active `bot.db` keys already store `https://ams.wingsvpn.shop/miniapp/sub/{id}`
 and NL Reality vless (`139.28.240.160`, not `:8443` / `www.apple.com`).
@@ -44,25 +43,16 @@ extend uses sqlite `clients.expiry_time` because classic `updateClient` is 404.
 
 Do not bind the site to `:443` — that port is VLESS Reality.
 
-## Cloudflare (one change)
+## Cloudflare (done 2026-08-27)
 
-In the `wingsvpn.shop` zone, proxied A/AAAA for `@` and `www`:
-
-- **from** Frankfurt `172.86.68.87`
-- **to** AMS `107.189.22.142` / `2602:fa59:5:5a8::1`
-  (has Let's Encrypt for `wingsvpn.shop`, proxies to 4VPS `:80`)
-
-SSL mode: Full (strict). Do **not** point orange-cloud at 4VPS `:443` — that port
-is VLESS Reality.
+Proxied A for `@` and `www` now origin **Amsterdam `107.189.22.142`** (was Frankfurt `172.86.68.87`).
+Public check: `https://wingsvpn.shop/health` = 200, Happ JSON = 3 NL profiles.
 
 Leave `ams.wingsvpn.shop` grey-cloud on AMS. Leave `cf.wingsvpn.shop` on the tunnel.
+Do **not** point orange-cloud at 4VPS `:443` — that port is VLESS Reality.
 
-If `CLOUDFLARE_API_TOKEN` is available:
+SSL: keep Full (strict). Re-run if origin IPs ever change:
 
 ```
-python3 infra/cloudflare/point_apex_to_ams.py --dry-run
 python3 infra/cloudflare/point_apex_to_ams.py --apply
 ```
-
-After the A record change, Happ/2RayTun 🔄 against `wingsvpn.shop` should return
-the same 3 NL profiles as `ams.wingsvpn.shop`.
