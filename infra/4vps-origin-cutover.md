@@ -1,8 +1,8 @@
 # 4VPS origin cutover (Frankfurt down → nLighten NL)
 
-Frankfurt (`172.86.68.87`) is unreachable (`No route to host`), so Cloudflare
-returns **523 Origin is unreachable** for `wingsvpn.shop`. VPN Reality stays on
-4VPS `:443` — the site cannot bind that port.
+Frankfurt (`172.86.68.87`) is unreachable (`No route to host`). VPN Reality stays
+on 4VPS `:443` — the site cannot bind that port. Cloudflare apex now origins to
+Amsterdam, not Frankfurt.
 
 ## What now runs on 4VPS `139.28.240.160`
 
