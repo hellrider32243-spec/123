@@ -18,9 +18,9 @@ def _env(name: str, default: str = "") -> str:
 
 
 SUBSCRIPTION_FORMAT = _env("SUBSCRIPTION_FORMAT", "json").lower()
-PUBLIC_HOST = _env("GRPC_PUBLIC_HOST", _env("PUBLIC_VLESS_HOST", "wingsvpn.shop"))
-GRPC_PORT = int(_env("GRPC_INBOUND_PORT", _env("PUBLIC_VLESS_PORT", "8443")))
-GRPC_SERVICE = _env("GRPC_SERVICE_NAME", "log")
+PUBLIC_HOST = _env("GRPC_PUBLIC_HOST", _env("PUBLIC_VLESS_HOST", "139.28.240.160"))
+GRPC_PORT = int(_env("GRPC_INBOUND_PORT", "49714"))
+GRPC_SERVICE = _env("GRPC_SERVICE_NAME", "ws")
 REALITY_FP = _env("REALITY_FP", _env("GRPC_REALITY_FP", "safari"))
 TCP_REALITY_FP = _env("TCP_REALITY_FP", _env("REALITY_FP", "chrome"))
 JSON_FRAG_LENGTH = _env("JSON_FRAGMENT_LENGTH", "80-250")
@@ -28,7 +28,7 @@ JSON_FRAG_INTERVAL = _env("JSON_FRAGMENT_INTERVAL", "10-100")
 JSON_FRAG_PACKETS = _env("JSON_FRAGMENT_PACKETS", "tlshello")
 HAPP_FRAGMENT = _env("HAPP_FRAGMENT", "50-100,10-20,1-3")
 GRPC_CLIENT_MULTIMODE = _env("GRPC_CLIENT_MULTIMODE", "true").lower() in ("1", "true", "yes")
-REALITY_SNI = _env("SNI", _env("REALITY_SNI", "www.apple.com"))
+REALITY_SNI = _env("SNI", _env("REALITY_SNI", "deepl.com"))
 REALITY_PBK = _env("REALITY_PBK", "")
 REALITY_SID = _env("REALITY_SID", "d1dd")
 PROFILE_AUTO = _env("VPN_PROFILE_AUTO", "🤖 Auto — умный выбор")
@@ -1729,7 +1729,7 @@ def build_grpc_antiblock_config(
     user_id: Optional[int] = None,
     **_: Any,
 ) -> dict[str, Any]:
-    """gRPC :8443 как «Быстрый» — стабильно в Happ iOS; chrome fp для LTE."""
+    """gRPC NL :49714 как «Быстрый» — стабильно в Happ iOS; chrome fp для LTE."""
     remark = display_name or _display_name(PROFILE_ANTIBLOCK, country=_clean_remark(base_remark))
     outbound = _grpc_outbound(
         client_uuid,
