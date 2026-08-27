@@ -13,6 +13,13 @@ returns **523 Origin is unreachable** for `wingsvpn.shop`. VPN Reality stays on
 
 JSON subscription already points at NL Reality (`139.28.240.160`, SNI `deepl.com`).
 
+Happ `/miniapp/sub/{telegram_id}` must not depend on `keys` in `bot.db` alone:
+x-ui can have the UUID while the bot copy from Frankfurt has no row (404).
+Fallback: `app/xui_vless_lookup.py` builds NL TCP Reality from `clients.email = {id}_*`.
+Backfill: `infra/backfill_nl_keys.py --apply --send`.
+
+Do not issue `wingsvpn.shop:8443` / SNI `www.apple.com` / gRPC `log` — that was Frankfurt.
+
 ## HTTPS front
 
 `https://ams.wingsvpn.shop` (grey-cloud to AMS nginx) now proxies to 4VPS `:80`.
