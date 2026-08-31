@@ -158,7 +158,8 @@ def sync_clients(inbound_id: int, src_clients: list, dry_run: bool) -> None:
         print("FAIL get hy2 inbound", data, file=sys.stderr)
         sys.exit(1)
     ib = data["obj"]
-    settings = json.loads(ib.get("settings") or "{}")
+    raw_settings = ib.get("settings") or "{}"
+    settings = json.loads(raw_settings) if isinstance(raw_settings, str) else dict(raw_settings or {})
     settings["version"] = 2
     settings["clients"] = clients
     ib["settings"] = json.dumps(settings, ensure_ascii=False)
