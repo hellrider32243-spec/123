@@ -5,7 +5,7 @@ JSON-подписка для Happ в стиле UltimaVPN.
 Сейчас в выдаче 4 профиля Amsterdam (NL):
   🇳🇱 🚀 Турбо      — VLESS + TCP + Reality + Vision :443  (флаг первым — иконка в Happ)
   🇳🇱 Нидерланды    — VLESS + gRPC + Reality :49714
-  🇪🇺 Hysteria      — VLESS + gRPC + Reality :41028         (имя как у Ultima; это НЕ hy2)
+  🇪🇺 Hysteria      — настоящий Hysteria2 UDP/QUIC :443
   🇳🇱 ⚡ XHTTP       — VLESS + XHTTP stream-up + Reality :8443
 
 Истекшая: инфо-узлы «продлите через бот».
@@ -97,13 +97,18 @@ AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "deepl.com")
 AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
 AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
 PROFILE_AMS_GRPC = _env("VPN_PROFILE_AMS_GRPC", "🇳🇱 Нидерланды")
-# gRPC Reality #2 — у Ultima называется «Hysteria» (это не hy2, а gRPC+Reality)
+# gRPC Reality #2 — старый фейковый «Hysteria» (оставлен как inbound 3, в подписке больше нет)
 AMS_GRPC2_HOST = _env("AMS_GRPC2_HOST", AMS_HOST)
 AMS_GRPC2_PORT = int(_env("AMS_GRPC2_PORT", "41028"))
 AMS_GRPC2_SNI = _env("AMS_GRPC2_SNI", "deepl.com")
 AMS_GRPC2_SERVICE = _env("AMS_GRPC2_SERVICE", "deepl")
 AMS_GRPC2_FP = _env("AMS_GRPC2_FP", "firefox")
 PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇪🇺 Hysteria")
+# Настоящий Hysteria2. Хост = sslip.io → тот же IP, валидный Let's Encrypt.
+_DEFAULT_HY2_HOST = f"wingsvpn.{AMS_HOST}.sslip.io" if AMS_HOST else "wingsvpn.139.28.240.160.sslip.io"
+AMS_HY2_HOST = _env("AMS_HY2_HOST", _env("HYSTERIA_PUBLIC_HOST", _DEFAULT_HY2_HOST))
+AMS_HY2_PORT = int(_env("AMS_HY2_PORT", _env("HYSTERIA_PORT", "443")))
+AMS_HY2_SNI = _env("AMS_HY2_SNI", _env("HYSTERIA_SNI", AMS_HY2_HOST))
 # XHTTP + Reality — рекомендуемая Xray 26 замена gRPC (stream-up / H2 внутри Reality).
 # Порт 8443: :443 занят TCP Reality, nginx на :443 нет.
 AMS_XHTTP_HOST = _env("AMS_XHTTP_HOST", AMS_HOST)
@@ -1605,14 +1610,15 @@ def build_hysteria_lte_config(
     sni: Optional[str] = None,
     display_name: Optional[str] = None,
     user_id: Optional[int] = None,
+    server_description: str = "Hysteria2 · LTE / 4G",
     **_: Any,
 ) -> dict[str, Any]:
     """Hysteria2 UDP/QUIC — лучше на LTE/4G при потере пакетов; auth = VLESS UUID."""
     _ = base_remark
-    h = host or HYSTERIA_PUBLIC_HOST
-    p = int(port or HYSTERIA_PORT)
-    server_name = sni or HYSTERIA_SNI or h
-    remark = display_name or PROFILE_HYSTERIA_LTE
+    h = host or AMS_HY2_HOST or HYSTERIA_PUBLIC_HOST
+    p = int(port or AMS_HY2_PORT or HYSTERIA_PORT)
+    server_name = sni or AMS_HY2_SNI or HYSTERIA_SNI or h
+    remark = display_name or PROFILE_AMS_HYSTERIA or PROFILE_HYSTERIA_LTE
     outbound = _hysteria2_outbound(
         client_uuid,
         host=h,
@@ -1625,12 +1631,35 @@ def build_hysteria_lte_config(
         outbound,
         meta=_happ_meta(
             user_id=user_id,
-            extra={
-                "serverDescription": "Hysteria2 · UDP/QUIC · BBR · LTE / 4G / слабый сигнал",
-            },
+            extra={"serverDescription": (server_description or "Hysteria2 · LTE / 4G")[:30]},
         ),
         routing=_ultima_routing_rules(),
-        dns_servers=["8.8.8.8", "8.8.4.4"],
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
+    )
+
+
+def build_nl_hysteria2_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
+    sni: Optional[str] = None,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    server_description: str = "Hysteria2 · LTE / 4G",
+    **_: Any,
+) -> dict[str, Any]:
+    """Настоящий Hysteria2 UDP/QUIC. Auth = VLESS UUID."""
+    return build_hysteria_lte_config(
+        client_uuid,
+        base_remark,
+        host=host or AMS_HY2_HOST or HYSTERIA_PUBLIC_HOST,
+        port=int(port or AMS_HY2_PORT),
+        sni=sni or AMS_HY2_SNI or AMS_HY2_HOST,
+        display_name=display_name or PROFILE_AMS_HYSTERIA,
+        user_id=user_id,
+        server_description=server_description,
     )
 
 
@@ -2232,17 +2261,12 @@ def build_happ_json_subscription(
             display_name=nl_name,
             server_description="VLESS | gRPC | Reality | :49714",
         ),
-        build_amsterdam_grpc_config(
+        build_nl_hysteria2_config(
             uuid,
             country,
             user_id=user_id,
             display_name=hy_name,
-            host=AMS_GRPC2_HOST or AMS_HOST,
-            port=AMS_GRPC2_PORT,
-            sni=AMS_GRPC2_SNI,
-            service_name=AMS_GRPC2_SERVICE,
-            fingerprint=AMS_GRPC2_FP or "firefox",
-            server_description="VLESS | gRPC | Reality | :41028 · Hysteria",
+            server_description="Hysteria2 · LTE / 4G",
         ),
         build_nl_xhttp_config(
             uuid,
