@@ -1,0 +1,14 @@
+[Unit]
+Description=NordWings admin payments Telegram bot (@Tritonpay_bot)
+After=network.target nordwings.service
+
+[Service]
+User=root
+WorkingDirectory=/opt/nordwings/app
+EnvironmentFile=/opt/nordwings/app/.env
+ExecStart=/opt/nordwings/app/venv/bin/python /opt/nordwings/app/admin_payments_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
