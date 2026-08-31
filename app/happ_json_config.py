@@ -3,10 +3,10 @@
 JSON-подписка для Happ в стиле UltimaVPN.
 
 Сейчас в выдаче 4 профиля Amsterdam (NL):
-  🚀 Турбо      — VLESS + TCP + Reality + Vision :443  (самый быстрый на стабильном канале)
-  🇳🇱 Нидерланды — VLESS + gRPC + Reality :49714         (обход, gRPC deprecated)
-  🇪🇺 Hysteria   — VLESS + gRPC + Reality :41028         (имя как у Ultima; это НЕ hy2)
-  ⚡ XHTTP      — VLESS + XHTTP stream-up + Reality :8443 (замена gRPC, мультиплекс)
+  🇳🇱 🚀 Турбо      — VLESS + TCP + Reality + Vision :443  (флаг первым — иконка в Happ)
+  🇳🇱 Нидерланды    — VLESS + gRPC + Reality :49714
+  🇪🇺 Hysteria      — VLESS + gRPC + Reality :41028         (имя как у Ultima; это НЕ hy2)
+  🇳🇱 ⚡ XHTTP       — VLESS + XHTTP stream-up + Reality :8443
 
 Истекшая: инфо-узлы «продлите через бот».
 """
@@ -112,7 +112,8 @@ AMS_XHTTP_SNI = _env("AMS_XHTTP_SNI", AMS_SNI)
 AMS_XHTTP_PATH = _env("AMS_XHTTP_PATH", "/")
 AMS_XHTTP_MODE = _env("AMS_XHTTP_MODE", "stream-up")
 AMS_XHTTP_FP = _env("AMS_XHTTP_FP", "chrome")
-PROFILE_AMS_XHTTP = _env("VPN_PROFILE_AMS_XHTTP", "⚡ XHTTP")
+# Флаг первым: иначе Happ рисует серый глобус вместо картинки страны.
+PROFILE_AMS_XHTTP = _env("VPN_PROFILE_AMS_XHTTP", "🇳🇱 ⚡ XHTTP")
 PROFILE_TITLE = _env("VPN_PROFILE_NAME", "TritonVPN")
 COUNTRY_LABEL = _env("VPN_COUNTRY_LABEL", "🇩🇪 Германия")
 VPN_MAX_DEVICES = max(1, int(_env("VPN_MAX_DEVICES", "3") or "3"))
@@ -2209,11 +2210,12 @@ def build_happ_json_subscription(
     if not uuid:
         raise ValueError("invalid vless link: no uuid")
     country = _clean_remark(p.get("remark") or COUNTRY_LABEL)
-    # Порядок прежних трёх не меняем — Happ не перетасовывает уже выбранный профиль.
-    turbo_name = "🚀 Турбо"
+    # Порядок профилей не меняем. Флаг страны — первый символ, иначе Happ
+    # ставит серый глобус (🚀 / ⚡ не считаются иконкой).
+    turbo_name = "🇳🇱 🚀 Турбо"
     nl_name = "🇳🇱 Нидерланды"
     hy_name = "🇪🇺 Hysteria"
-    xhttp_name = PROFILE_AMS_XHTTP or "⚡ XHTTP"
+    xhttp_name = PROFILE_AMS_XHTTP or "🇳🇱 ⚡ XHTTP"
     profiles: list[dict[str, Any]] = [
         build_amsterdam_reality_config(
             uuid,
@@ -2221,7 +2223,7 @@ def build_happ_json_subscription(
             user_id=user_id,
             display_name=turbo_name,
             with_fragment=False,
-            server_description="VLESS | TCP | Reality | :443 · самый быстрый",
+            server_description="Самый быстрый",
         ),
         build_amsterdam_grpc_config(
             uuid,
@@ -2247,7 +2249,7 @@ def build_happ_json_subscription(
             country,
             user_id=user_id,
             display_name=xhttp_name,
-            server_description="VLESS | XHTTP stream-up | Reality | :8443 · замена gRPC",
+            server_description="Новый · вместо gRPC",
         ),
     ]
     return profiles
