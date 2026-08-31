@@ -165,7 +165,6 @@ def patch_env(inbound_id: int) -> None:
         "AMS_XHTTP_MODE": "stream-up",
         "AMS_XHTTP_FP": "chrome",
         "XHTTP_REALITY_INBOUND_ID": str(inbound_id),
-        "NL_XUI_INBOUND_IDS": "",  # filled per-file
     }
     for env_path in ENV_PATHS:
         p = Path(env_path)
@@ -173,23 +172,26 @@ def patch_env(inbound_id: int) -> None:
             continue
         lines = p.read_text(encoding="utf-8").splitlines()
         idx = {line.split("=", 1)[0]: i for i, line in enumerate(lines) if "=" in line and not line.strip().startswith("#")}
-        current_ids = ""
+        file_updates = dict(updates)
         if "NL_XUI_INBOUND_IDS" in idx:
             current_ids = lines[idx["NL_XUI_INBOUND_IDS"]].split("=", 1)[1].strip()
-        ids = [x.strip() for x in current_ids.split(",") if x.strip()]
-        if str(inbound_id) not in ids:
-            ids.append(str(inbound_id))
-        if not ids:
-            ids = ["1", "2", "3", str(inbound_id)]
-        updates["NL_XUI_INBOUND_IDS"] = ",".join(ids)
-        for key, val in updates.items():
+            ids = [x.strip() for x in current_ids.split(",") if x.strip()]
+            if str(inbound_id) not in ids:
+                ids.append(str(inbound_id))
+            file_updates["NL_XUI_INBOUND_IDS"] = ",".join(ids)
+        for key, val in file_updates.items():
             line = f"{key}={val}"
             if key in idx:
                 lines[idx[key]] = line
             else:
                 lines.append(line)
         p.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        print(f"  env updated: {env_path} NL_XUI_INBOUND_IDS={updates['NL_XUI_INBOUND_IDS']}")
+        extra = (
+            f" NL_XUI_INBOUND_IDS={file_updates['NL_XUI_INBOUND_IDS']}"
+            if "NL_XUI_INBOUND_IDS" in file_updates
+            else ""
+        )
+        print(f"  env updated: {env_path}{extra}")
 
 
 def main() -> None:
