@@ -43,7 +43,7 @@ SSL/TLS → Overview: **Flexible** is enough (Cloudflare HTTPS, origin HTTP `:80
 
 Expect `https://wingsvpn.shop` 200, `/health` JSON, `/miniapp/`, Happ `/miniapp/sub/<id>`.
 
-Then move Telegram webhooks off sslip.io:
+Telegram webhooks (live):
 
 - main bot → `https://wingsvpn.shop/telegram-webhook`
 - `@Tritonpay_bot` → `https://wingsvpn.shop/payments-bot-webhook`
