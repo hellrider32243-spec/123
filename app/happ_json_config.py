@@ -1129,9 +1129,18 @@ def _auto_all_routing_rules() -> dict[str, Any]:
                         "expected": 1,
                         "maxRTT": "2500ms",
                         "tolerance": 0.05,
+                        # TCP Reality открывает отдельное TCP-соединение на каждый поток —
+                        # именно такие «пачки» новых SYN к одному IP провайдерский DPI
+                        # режет первыми. XHTTP/gRPC/Hy2 живут в одном мультиплексном
+                        # соединении, поэтому TCP штрафуем и выбираем его, только если
+                        # он заметно быстрее.
+                        "costs": [{"regexp": False, "match": f"{AUTO_ALL_TAG_PREFIX}tcp", "value": 1.5}],
                     },
                 },
-                "fallbackTag": f"{AUTO_ALL_TAG_PREFIX}tcp",
+                # Пока observatory не собрал замеры (или клиент его не поддерживает),
+                # трафик идёт в XHTTP: один h2-канал на все потоки переживает
+                # частичный портбан, где новые TCP-соединения доходят через раз.
+                "fallbackTag": f"{AUTO_ALL_TAG_PREFIX}xhttp",
             }
         ],
         "rules": rules,
