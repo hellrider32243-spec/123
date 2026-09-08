@@ -170,20 +170,18 @@ def _telegram_direct_ips() -> list[str]:
     ]
 
 
-def _telegram_ipv6() -> list[str]:
-    """IPv6 Telegram → direct: на 4VPS IPv6 выключен, через туннель IPv6 не выйдет."""
-    return [
-        "2001:b28:f23d::/48",
-        "2001:b28:f23f::/48",
-        "2001:67c:4e8::/48",
-        "2001:b28:f23c::/48",
-        "2a0a:f280::/32",
-    ]
+def _ipv6_block_rule() -> dict[str, Any]:
+    """У VPS нет IPv6, поэтому любой IPv6-адрес внутри туннеля глушим сразу:
+    приложение получает отказ и по Happy Eyeballs уходит на IPv4 через VPN.
+    Раньше IPv6 Telegram уходил в direct — на сети с IPv6 (МГТС, мобильные)
+    это означало «VPN подключён, а Telegram/YouTube идут мимо и не работают»."""
+    return {"type": "field", "ip": ["::/0"], "outboundTag": "block"}
 
 
 def _telegram_direct_rules() -> list[dict[str, Any]]:
     # Не geoip:telegram — в Happ iOS нет секции TELEGRAM, ядро не стартует.
     return [
+        _ipv6_block_rule(),
         {
             "domain": _telegram_direct_domains(),
             "outboundTag": "tg",
@@ -192,11 +190,6 @@ def _telegram_direct_rules() -> list[dict[str, Any]]:
         {
             "ip": _telegram_direct_ips(),
             "outboundTag": "tg",
-            "type": "field",
-        },
-        {
-            "ip": _telegram_ipv6(),
-            "outboundTag": "direct",
             "type": "field",
         },
     ]
@@ -291,7 +284,7 @@ def get_traffic_bytes(email: str) -> tuple[int, int]:
 def _ultima_routing_rules() -> dict[str, Any]:
     """Ultima: .ru direct, YouTube/остальное через VPN.
     Telegram IPv4 — через 4VPS (там TG открывается; Cloudzy AMS — нет).
-    IPv6 Telegram — direct: у VPS нет IPv6."""
+    IPv6 внутри туннеля блокируем целиком (у VPS нет IPv6)."""
     return {
         "domainMatcher": "hybrid",
         "domainStrategy": "IPIfNonMatch",
