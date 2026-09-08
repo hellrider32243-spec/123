@@ -24,7 +24,7 @@ def _env(name: str, default: str = "") -> str:
 
 
 SUBSCRIPTION_FORMAT = _env("SUBSCRIPTION_FORMAT", "json").lower()
-PUBLIC_HOST = _env("GRPC_PUBLIC_HOST", _env("PUBLIC_VLESS_HOST", "139.28.240.160"))
+PUBLIC_HOST = _env("GRPC_PUBLIC_HOST", _env("PUBLIC_VLESS_HOST", "139.28.240.210"))
 GRPC_PORT = int(_env("GRPC_INBOUND_PORT", "49714"))
 GRPC_SERVICE = _env("GRPC_SERVICE_NAME", "ws")
 REALITY_FP = _env("REALITY_FP", _env("GRPC_REALITY_FP", "safari"))
@@ -81,7 +81,7 @@ PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блоки
 # === Amsterdam clean-IP (4VPS nLighten) — схема как у UltimaVPN ===
 # gRPC Reality на высоком порту + TCP Reality :443 + fragment.
 # Публичный ключ можно держать в репо; privateKey только на VPS.
-AMS_HOST = _env("AMS_HOST", "139.28.240.160")
+AMS_HOST = _env("AMS_HOST", "139.28.240.210")
 AMS_PORT = int(_env("AMS_PORT", "443"))
 AMS_PBK = _env("AMS_PBK", "-IYnX45q6qyRMrl_bTLLeW97TCBdZW0aTNu7WBF4Nm0")
 AMS_SID = _env("AMS_SID", "a7c31e04")
@@ -105,7 +105,7 @@ AMS_GRPC2_SERVICE = _env("AMS_GRPC2_SERVICE", "deepl")
 AMS_GRPC2_FP = _env("AMS_GRPC2_FP", "firefox")
 PROFILE_AMS_HYSTERIA = _env("VPN_PROFILE_AMS_HYSTERIA", "🇪🇺 Hysteria")
 # Настоящий Hysteria2. Хост = sslip.io → тот же IP, валидный Let's Encrypt.
-_DEFAULT_HY2_HOST = f"wingsvpn.{AMS_HOST}.sslip.io" if AMS_HOST else "wingsvpn.139.28.240.160.sslip.io"
+_DEFAULT_HY2_HOST = f"wingsvpn.{AMS_HOST}.sslip.io" if AMS_HOST else "wingsvpn.139.28.240.210.sslip.io"
 AMS_HY2_HOST = _env("AMS_HY2_HOST", _env("HYSTERIA_PUBLIC_HOST", _DEFAULT_HY2_HOST))
 AMS_HY2_PORT = int(_env("AMS_HY2_PORT", _env("HYSTERIA_PORT", "443")))
 AMS_HY2_SNI = _env("AMS_HY2_SNI", _env("HYSTERIA_SNI", AMS_HY2_HOST))
