@@ -2450,6 +2450,14 @@ def json_subscription_enabled() -> bool:
     return SUBSCRIPTION_FORMAT in ("json", "1", "true", "yes")
 
 
+def _geo_base_url() -> str:
+    base = _env("HAPP_GEO_BASE_URL", "")
+    if base:
+        return base.rstrip("/")
+    host = AMS_HY2_HOST or _DEFAULT_HY2_HOST
+    return f"https://{host}:{_env('HAPP_GEO_PORT', '88')}/geo"
+
+
 def happ_routing_profile() -> dict[str, Any]:
     """Профиль маршрутизации Happ, который едет в заголовке подписки `routing:`.
     Для JSON-конфигов Happ берёт из него DNS туннеля и geo-файлы: зарубежные
@@ -2465,11 +2473,12 @@ def happ_routing_profile() -> dict[str, Any]:
         "DomesticDNSType": "DoH",
         "DomesticDNSDomain": "https://77.88.8.8/dns-query",
         "DomesticDNSIP": "77.88.8.8",
-        # Свои урезанные geo-файлы (~0.6 МБ вместо 28 МБ) за Cloudflare: GitHub из РФ
-        # отдаёт релизы так медленно, что Happ падает по таймауту при импорте routing.
-        "Geoipurl": _env("HAPP_GEOIP_URL", f"https://{CF_WS_HOST}/geo/geoip.dat"),
-        "Geositeurl": _env("HAPP_GEOSITE_URL", f"https://{CF_WS_HOST}/geo/geosite.dat"),
-        "LastUpdated": _env("HAPP_ROUTING_UPDATED", "1789056000"),
+        # Свои урезанные geo-файлы (~0.6 МБ вместо 28 МБ) с прямого адреса сервера:
+        # GitHub из РФ отдаёт релизы так медленно, что Happ падает по таймауту при
+        # импорте routing, а домен за Cloudflare с ECH российский DPI режет.
+        "Geoipurl": _env("HAPP_GEOIP_URL", f"{_geo_base_url()}/geoip.dat"),
+        "Geositeurl": _env("HAPP_GEOSITE_URL", f"{_geo_base_url()}/geosite.dat"),
+        "LastUpdated": _env("HAPP_ROUTING_UPDATED", "1789057000"),
         "DnsHosts": {"lkfl2.nalog.ru": "213.24.64.175", "lknpd.nalog.ru": "213.24.64.181"},
         "DirectSites": ["geosite:category-ru"],
         "DirectIp": ["geoip:ru"],
