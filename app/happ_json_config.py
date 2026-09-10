@@ -72,12 +72,12 @@ TCP_PORT = TCP_CLIENT_PORT
 WHITELIST_SNI = _env("WHITELIST_SNI", "hh.ru")
 TCP_VLESS_FLOW = _env("TCP_VLESS_FLOW", "xtls-rprx-vision")
 # С РФ прямой IP AMS режется на TLS (TCP есть, 0 байт). Клиентам — CF anycast.
-CF_WS_HOST = _env("CF_WS_HOST", "cf.wingsvpn.shop")
+CF_WS_HOST = _env("CF_WS_HOST", "wingsvpn.shop")
 CF_WS_PORT = int(_env("CF_WS_PORT", "443"))
 CF_WS_PATH = _env("CF_WS_PATH", "/cfws?ed=2560")
 CF_WS_SNI = _env("CF_WS_SNI", CF_WS_HOST)
-CF_WS_FP = _env("CF_WS_FP", "safari")
-PROFILE_CF = _env("VPN_PROFILE_CF", "☁️ Cloudflare — обход блокировок")
+CF_WS_FP = _env("CF_WS_FP", "chrome")
+PROFILE_CF = _env("VPN_PROFILE_CF", "🇳🇱 🌉 Мост CDN")
 # === Amsterdam clean-IP (4VPS nLighten) — схема как у UltimaVPN ===
 # gRPC Reality на высоком порту + TCP Reality :443 + fragment.
 # Публичный ключ можно держать в репо; privateKey только на VPS.
@@ -87,7 +87,7 @@ AMS_PBK = _env("AMS_PBK", "-IYnX45q6qyRMrl_bTLLeW97TCBdZW0aTNu7WBF4Nm0")
 AMS_SID = _env("AMS_SID", "a7c31e04")
 AMS_SID2 = _env("AMS_SID2", AMS_SID)
 AMS_SNI = _env("AMS_SNI", "deepl.com")
-AMS_FP = _env("AMS_FP", "qq")  # как Ultima TCP (Швеция)
+AMS_FP = _env("AMS_FP", "chrome")
 AMS_FLOW = _env("AMS_FLOW", TCP_VLESS_FLOW or "xtls-rprx-vision")
 PROFILE_AMS = _env("VPN_PROFILE_AMS", "🇳🇱 Нидерланды #2")
 # gRPC Reality #1 — основной профиль Ultima «Нидерланды»
@@ -95,7 +95,7 @@ AMS_GRPC_HOST = _env("AMS_GRPC_HOST", AMS_HOST)
 AMS_GRPC_PORT = int(_env("AMS_GRPC_PORT", "49714"))
 AMS_GRPC_SNI = _env("AMS_GRPC_SNI", "deepl.com")
 AMS_GRPC_SERVICE = _env("AMS_GRPC_SERVICE", "ws")
-AMS_GRPC_FP = _env("AMS_GRPC_FP", "firefox")
+AMS_GRPC_FP = _env("AMS_GRPC_FP", "chrome")
 PROFILE_AMS_GRPC = _env("VPN_PROFILE_AMS_GRPC", "🇳🇱 Нидерланды")
 # gRPC Reality #2 — старый фейковый «Hysteria» (оставлен как inbound 3, в подписке больше нет)
 AMS_GRPC2_HOST = _env("AMS_GRPC2_HOST", AMS_HOST)
@@ -307,21 +307,32 @@ def _ultima_routing_rules() -> dict[str, Any]:
                 ],
                 "outboundTag": "proxy",
             },
-            {
-                "type": "field",
-                "domain": [
-                    "avito.st",
-                    "domain:yandex.com",
-                    "domain:yandex.net",
-                    "regexp:.*\\.ru$",
-                    "regexp:.*\\.xn--p1ai$",
-                    "regexp:.*\\.xn--p1acf$",
-                    "regexp:.*\\.xn--p1ag$",
-                ],
-                "outboundTag": "direct",
-            },
+            *_ru_direct_rules(),
         ],
     }
+
+def _ru_direct_rules() -> list[dict[str, Any]]:
+    """Российские сервисы — напрямую: и по домену (geosite:category-ru + свои
+    списки), и по IP (geoip:ru — ловит банки/госуслуги/CDN на .com и голые IP,
+    которые с иностранного адреса блокируются)."""
+    return [
+        {
+            "type": "field",
+            "domain": [
+                "geosite:category-ru",
+                "domain:2ip.ru",
+                "avito.st",
+                "domain:yandex.com",
+                "domain:yandex.net",
+                "regexp:.*\\.ru$",
+                "regexp:.*\\.xn--p1ai$",
+                "regexp:.*\\.xn--p1acf$",
+                "regexp:.*\\.xn--p1ag$",
+            ],
+            "outboundTag": "direct",
+        },
+        {"type": "field", "ip": ["geoip:ru"], "outboundTag": "direct"},
+    ]
 
 def _routing_rules() -> dict[str, Any]:
     """Совместимость: базовый роутинг = UltimaVPN."""
@@ -1080,7 +1091,13 @@ AUTO_ALL_TAG_PREFIX = "auto_"
 
 
 def _auto_all_outbound_tags() -> list[str]:
-    return [f"{AUTO_ALL_TAG_PREFIX}tcp", f"{AUTO_ALL_TAG_PREFIX}xhttp", f"{AUTO_ALL_TAG_PREFIX}grpc", f"{AUTO_ALL_TAG_PREFIX}hy2"]
+    return [
+        f"{AUTO_ALL_TAG_PREFIX}tcp",
+        f"{AUTO_ALL_TAG_PREFIX}xhttp",
+        f"{AUTO_ALL_TAG_PREFIX}grpc",
+        f"{AUTO_ALL_TAG_PREFIX}hy2",
+        f"{AUTO_ALL_TAG_PREFIX}ws",
+    ]
 
 
 def _auto_all_burst_observatory() -> dict[str, Any]:
@@ -1149,6 +1166,7 @@ def _turbo_routing_rules() -> dict[str, Any]:
             {"domain": ["oneme.ru", "max.ru"], "outboundTag": "block", "type": "field"},
             {"outboundTag": "direct", "protocol": ["bittorrent"], "type": "field"},
             *_telegram_direct_rules(),
+            *_ru_direct_rules(),
         ],
     }
 
@@ -2247,12 +2265,16 @@ def build_nl_auto_config(
     каждого канала, leastLoad держит трафик на самом быстром живом; при
     портбане TCP автоматически уходит на Hysteria2 (UDP)."""
     remark = display_name or "🇳🇱 🤖 Авто"
-    tcp, xhttp, grpc, hy2 = _auto_all_outbound_tags()
+    tcp, xhttp, grpc, hy2, ws = _auto_all_outbound_tags()
     sources = [
         (tcp, build_amsterdam_reality_config(client_uuid, base_remark, user_id=user_id, with_fragment=False)),
         (xhttp, build_nl_xhttp_config(client_uuid, base_remark, user_id=user_id)),
         (grpc, build_amsterdam_grpc_config(client_uuid, base_remark, user_id=user_id)),
         (hy2, build_nl_hysteria2_config(client_uuid, base_remark, user_id=user_id)),
+        # Мост через Cloudflare CDN: IP сервера не участвует, переживает полный
+        # бан адреса. RTT выше, поэтому leastLoad возьмёт его только когда
+        # прямые каналы не отвечают.
+        (ws, build_cloudflare_ws_config(client_uuid, base_remark, user_id=user_id)),
     ]
     outbounds: list[dict[str, Any]] = []
     for tag, cfg in sources:
@@ -2381,6 +2403,12 @@ def build_happ_json_subscription(
             display_name=xhttp_name,
             server_description="Новый · вместо gRPC",
         ),
+        build_cloudflare_ws_config(
+            uuid,
+            country,
+            user_id=user_id,
+            display_name=PROFILE_CF,
+        ),
     ]
     return profiles
 
@@ -2402,3 +2430,41 @@ def subscription_userinfo(
 
 def json_subscription_enabled() -> bool:
     return SUBSCRIPTION_FORMAT in ("json", "1", "true", "yes")
+
+
+def happ_routing_profile() -> dict[str, Any]:
+    """Профиль маршрутизации Happ, который едет в заголовке подписки `routing:`.
+    Для JSON-конфигов Happ берёт из него DNS туннеля и geo-файлы: зарубежные
+    имена — Google DoH через VPN, российские — Яндекс DoH напрямую (CDN отдаёт
+    ближние адреса), geosite/geoip Loyalsoldier с тегами category-ru / ru."""
+    return {
+        "Name": _env("HAPP_ROUTING_NAME", PROFILE_TITLE),
+        "GlobalProxy": "true",
+        "RouteOrder": "block-proxy-direct",
+        "RemoteDNSType": "DoH",
+        "RemoteDNSDomain": "https://8.8.8.8/dns-query",
+        "RemoteDNSIP": "8.8.8.8",
+        "DomesticDNSType": "DoH",
+        "DomesticDNSDomain": "https://77.88.8.8/dns-query",
+        "DomesticDNSIP": "77.88.8.8",
+        "Geoipurl": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat",
+        "Geositeurl": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat",
+        "LastUpdated": _env("HAPP_ROUTING_UPDATED", "1789000000"),
+        "DnsHosts": {"lkfl2.nalog.ru": "213.24.64.175", "lknpd.nalog.ru": "213.24.64.181"},
+        "DirectSites": ["geosite:category-ru"],
+        "DirectIp": ["geoip:ru"],
+        "ProxySites": [],
+        "ProxyIp": [],
+        "BlockSites": [],
+        "BlockIp": [],
+        "DomainStrategy": "IPIfNonMatch",
+        "FakeDNS": "false",
+        "UseChunkFiles": "true",
+    }
+
+
+def happ_routing_header() -> str:
+    import base64 as _b64
+    import json
+    raw = json.dumps(happ_routing_profile(), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return "happ://routing/add/" + _b64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
