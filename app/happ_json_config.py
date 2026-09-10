@@ -1171,6 +1171,45 @@ def _turbo_routing_rules() -> dict[str, Any]:
     }
 
 
+SPEED_BUFFER_KB = int(_env("HAPP_BUFFER_KB", "512") or 512)
+
+
+def _speed_policy() -> dict[str, Any]:
+    """bufferSize — внутренний буфер xray на запрос. На ARM64 (все современные
+    телефоны) дефолт 4 КБ, на десктопе 512 КБ; маленький буфер режет скорость
+    на путях с большим RTT×полосой. Выравниваем до десктопного значения."""
+    return {"levels": {"0": {"bufferSize": SPEED_BUFFER_KB}}}
+
+
+def _speed_sockopt() -> dict[str, Any]:
+    """tcpNoDelay — не копить мелкие пакеты (TLS-рекорды уходят сразу);
+    keep-alive держит NAT-маппинг мобильного оператора живым между запросами,
+    чтобы не платить рукопожатие заново."""
+    return {"tcpNoDelay": True, "tcpKeepAliveInterval": 30}
+
+
+def _speed_routing_rules() -> dict[str, Any]:
+    """Маршрутизация профиля скорости. domainStrategy=AsIs: клиент не ждёт
+    DNS-ответ ради проверки IP-правил на каждый новый домен (при IPIfNonMatch
+    это +1 RTT через туннель перед каждым первым соединением). Домен уходит на
+    сервер как есть — сервер резолвит его сам и получает CDN-узлы, ближние к
+    NL-выходу, а не к RU-клиенту. IP-правила продолжают работать для
+    соединений по «голому» IP (банковские приложения, RU CDN)."""
+    ru_domains, ru_ips = _ru_direct_rules()
+    return {
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs",
+        "rules": [
+            _ipv6_block_rule(),
+            {"type": "field", "ip": ["geoip:private"], "outboundTag": "direct"},
+            {"type": "field", "domain": ["oneme.ru", "max.ru"], "outboundTag": "block"},
+            {"type": "field", "protocol": ["bittorrent"], "outboundTag": "direct"},
+            ru_domains,
+            ru_ips,
+        ],
+    }
+
+
 def _client_inbounds(*, route_only: bool = False) -> list[dict[str, Any]]:
     sniffing = {
         "destOverride": ["http", "tls", "quic"],
@@ -2182,6 +2221,62 @@ def build_amsterdam_reality_config(
     )
 
 
+def build_nl_speed_config(
+    client_uuid: str,
+    base_remark: str = COUNTRY_LABEL,
+    *,
+    display_name: Optional[str] = None,
+    user_id: Optional[int] = None,
+    server_description: str = "Макс. скорость · TCP Vision",
+    **_: Any,
+) -> dict[str, Any]:
+    """Профиль максимальной скорости.
+
+    Транспорт: VLESS + TCP + Reality + xtls-rprx-vision :443 — единственный
+    вариант без двойного шифрования (внутренний TLS идёт «как есть»), без
+    оверхеда gRPC/h2-фреймов и без лишнего хопа через CDN; на сервере ядро
+    делает splice, на клиенте — минимум работы CPU. Fingerprint chrome, без
+    fragment (fragment дробит ClientHello и стоит RTT на каждое соединение),
+    без mux (mux.cool режет пропускную способность одного потока).
+
+    Клиентские настройки: tcpNoDelay + keep-alive (см. _speed_sockopt),
+    bufferSize 512 КБ вместо 4 КБ на ARM64 (см. _speed_policy), маршрутизация
+    AsIs без клиентского DNS-ожидания (см. _speed_routing_rules). Отдельный
+    tg-канал не нужен — это тот же TCP Reality :443.
+
+    Серверная часть, без которой это не работает в полную силу: BBR + fq,
+    tcp_rmem/tcp_wmem до 32 МБ, tcp_slow_start_after_idle=0
+    (/etc/sysctl.d/99-nordwings-tune.conf на VPS)."""
+    remark = display_name or PROFILE_AMS
+    outbound = _tcp_outbound(
+        client_uuid,
+        host=AMS_HOST,
+        port=int(AMS_PORT),
+        sni=AMS_SNI,
+        pbk=AMS_PBK,
+        sid=AMS_SID,
+        fingerprint=AMS_FP or "chrome",
+        flow=AMS_FLOW or "xtls-rprx-vision",
+        with_fragment=False,
+    )
+    outbound["streamSettings"]["sockopt"] = _speed_sockopt()
+    outbound["mux"] = {"enabled": False}
+    cfg = _base_config(
+        remark,
+        outbound,
+        meta=_happ_meta(
+            user_id=user_id,
+            extra={"serverDescription": server_description[:30]},
+        ),
+        routing=_speed_routing_rules(),
+        dns={"queryStrategy": "UseIPv4", "servers": ["8.8.8.8", "1.1.1.1"]},
+    )
+    cfg["outbounds"] = [o for o in cfg["outbounds"] if o.get("tag") != "tg"]
+    cfg["routing"] = _retag_rules(cfg["routing"], {"tg": "proxy"})
+    cfg["policy"] = _speed_policy()
+    return cfg
+
+
 def build_amsterdam_grpc_config(
     client_uuid: str,
     base_remark: str = COUNTRY_LABEL,
@@ -2310,6 +2405,7 @@ def build_nl_auto_config(
     # _balancer_config добавляет отдельный "tg" outbound — в Авто он не нужен,
     # Telegram идёт через балансер вместе со всем остальным.
     cfg["outbounds"] = [o for o in cfg["outbounds"] if o.get("tag") != "tg"]
+    cfg["policy"] = _speed_policy()
     return cfg
 
 
@@ -2392,13 +2488,12 @@ def build_happ_json_subscription(
             user_id=user_id,
             display_name=auto_name,
         ),
-        build_amsterdam_reality_config(
+        build_nl_speed_config(
             uuid,
             country,
             user_id=user_id,
             display_name=turbo_name,
-            with_fragment=False,
-            server_description="Самый быстрый",
+            server_description="Макс. скорость · TCP Vision",
         ),
         build_amsterdam_grpc_config(
             uuid,
