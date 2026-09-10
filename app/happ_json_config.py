@@ -2465,9 +2465,11 @@ def happ_routing_profile() -> dict[str, Any]:
         "DomesticDNSType": "DoH",
         "DomesticDNSDomain": "https://77.88.8.8/dns-query",
         "DomesticDNSIP": "77.88.8.8",
-        "Geoipurl": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat",
-        "Geositeurl": "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat",
-        "LastUpdated": _env("HAPP_ROUTING_UPDATED", "1789000000"),
+        # Свои урезанные geo-файлы (~0.6 МБ вместо 28 МБ) за Cloudflare: GitHub из РФ
+        # отдаёт релизы так медленно, что Happ падает по таймауту при импорте routing.
+        "Geoipurl": _env("HAPP_GEOIP_URL", f"https://{CF_WS_HOST}/geo/geoip.dat"),
+        "Geositeurl": _env("HAPP_GEOSITE_URL", f"https://{CF_WS_HOST}/geo/geosite.dat"),
+        "LastUpdated": _env("HAPP_ROUTING_UPDATED", "1789056000"),
         "DnsHosts": {"lkfl2.nalog.ru": "213.24.64.175", "lknpd.nalog.ru": "213.24.64.181"},
         "DirectSites": ["geosite:category-ru"],
         "DirectIp": ["geoip:ru"],
