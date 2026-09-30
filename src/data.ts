@@ -15,13 +15,13 @@ export const categories = [
     name: 'Ягоды и сухофрукты',
     note: 'Чернослив, инжир и сезонные ягоды',
     image:
-      'https://images.unsplash.com/photo-1464965911861-746a04b4b188?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1498557850523-fd3d118b962e?auto=format&fit=crop&w=900&q=80',
   },
   {
     name: 'Сезонное',
     note: 'Дыни, новинки и то, что только привезли',
     image:
-      'https://images.unsplash.com/photo-1571575173700-afb9492e6a50?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=900&q=80',
   },
 ] as const
 
