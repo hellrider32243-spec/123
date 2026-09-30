@@ -3,7 +3,7 @@ import { categories, store } from './data'
 import './App.css'
 
 const heroImage =
-  'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=2000&q=80'
+  'https://images.unsplash.com/photo-1488459716781-31db52582fe9?auto=format&fit=crop&w=2000&q=80'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -21,11 +21,11 @@ function App() {
         </a>
         <nav className="nav-links" aria-label="Основная навигация">
           <a href="#assortiment">Ассортимент</a>
-          <a href="#dostavka">Доставка</a>
+          <a href="#zakaz">Заказ</a>
           <a href="#magazin">Магазин</a>
         </nav>
-        <a className="nav-cta" href={store.phoneHref}>
-          Позвонить
+        <a className="nav-cta" href={store.telegram} target="_blank" rel="noreferrer">
+          Telegram
         </a>
       </header>
 
@@ -34,8 +34,8 @@ function App() {
           <div className="hero-media">
             <motion.img
               src={heroImage}
-              alt="Свежие продукты на полках магазина"
-              initial={reduceMotion ? false : { scale: 1.08, opacity: 0.7 }}
+              alt="Свежие фрукты и овощи на прилавке"
+              initial={reduceMotion ? false : { scale: 1.08, opacity: 0.75 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
             />
@@ -50,7 +50,9 @@ function App() {
               animate="show"
               transition={{ duration: 0.7, delay: 0.1 }}
             >
-              {store.brand}
+              Фруктовый
+              <br />
+              дом
             </motion.p>
             <motion.h1
               variants={fadeUp}
@@ -58,9 +60,9 @@ function App() {
               animate="show"
               transition={{ duration: 0.75, delay: 0.22 }}
             >
-              Свежее рядом.
+              Свежий привоз
               <br />
-              Заказ — онлайн.
+              каждый день
             </motion.h1>
             <motion.p
               className="hero-lead"
@@ -69,8 +71,8 @@ function App() {
               animate="show"
               transition={{ duration: 0.7, delay: 0.34 }}
             >
-              Магазин у дома в центре Москвы: продукты на каждый день и доставка
-              через Яндекс Маркет и Купер.
+              Фрукты и овощи в Черноголовке. Заказывайте в Telegram или
+              заходите на Школьный бульвар, 10.
             </motion.p>
             <motion.div
               className="hero-actions"
@@ -79,8 +81,13 @@ function App() {
               animate="show"
               transition={{ duration: 0.7, delay: 0.46 }}
             >
-              <a className="btn btn-primary" href="#dostavka">
-                Заказать онлайн
+              <a
+                className="btn btn-primary"
+                href={store.telegram}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Заказать в Telegram
               </a>
               <a className="btn btn-ghost" href="#magazin">
                 Как добраться
@@ -91,8 +98,8 @@ function App() {
 
         <section id="assortiment" className="section assortment">
           <div className="section-head">
-            <h2>Ассортимент</h2>
-            <p>Четыре полки, с которых собирают большинство заказов.</p>
+            <h2>Что привозим</h2>
+            <p>Следите за новинками и ценами в нашем Telegram.</p>
           </div>
           <div className="assortment-grid">
             {categories.map((item, index) => (
@@ -116,16 +123,37 @@ function App() {
           </div>
         </section>
 
-        <section id="dostavka" className="section delivery">
+        <section id="zakaz" className="section delivery">
           <div className="delivery-panel">
             <div className="section-head light">
-              <h2>Доставка и онлайн-заказы</h2>
+              <h2>Заказ и доставка</h2>
               <p>
-                Выберите удобный сервис — соберём заказ в магазине и передадим
-                курьеру.
+                Напишите в Telegram, что нужно — соберём заказ. Также можно
+                позвонить или заказать через сервисы доставки.
               </p>
             </div>
             <div className="delivery-list">
+              <a
+                className="delivery-link"
+                href={store.telegram}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <span className="delivery-name">Telegram</span>
+                <span className="delivery-desc">
+                  {store.telegramLabel} — цены и заказ
+                </span>
+                <span className="delivery-arrow" aria-hidden="true">
+                  →
+                </span>
+              </a>
+              <a className="delivery-link" href={store.phoneHref}>
+                <span className="delivery-name">Телефон</span>
+                <span className="delivery-desc">{store.phoneDisplay}</span>
+                <span className="delivery-arrow" aria-hidden="true">
+                  →
+                </span>
+              </a>
               <a
                 className="delivery-link"
                 href="https://market.yandex.ru/"
@@ -133,9 +161,7 @@ function App() {
                 rel="noreferrer"
               >
                 <span className="delivery-name">Яндекс Маркет</span>
-                <span className="delivery-desc">
-                  Экспресс из магазина по Москве
-                </span>
+                <span className="delivery-desc">Онлайн-заказ с доставкой</span>
                 <span className="delivery-arrow" aria-hidden="true">
                   →
                 </span>
@@ -147,16 +173,7 @@ function App() {
                 rel="noreferrer"
               >
                 <span className="delivery-name">Купер</span>
-                <span className="delivery-desc">
-                  Доставка продуктов с нашей точки
-                </span>
-                <span className="delivery-arrow" aria-hidden="true">
-                  →
-                </span>
-              </a>
-              <a className="delivery-link" href={store.phoneHref}>
-                <span className="delivery-name">Заказ по телефону</span>
-                <span className="delivery-desc">{store.phoneDisplay}</span>
+                <span className="delivery-desc">Доставка продуктов на дом</span>
                 <span className="delivery-arrow" aria-hidden="true">
                   →
                 </span>
@@ -168,10 +185,10 @@ function App() {
         <section id="magazin" className="section visit">
           <div className="visit-layout">
             <div className="visit-copy">
-              <h2>Магазин в Москве</h2>
+              <h2>Магазин в Черноголовке</h2>
               <p className="visit-lead">
-                Заходите сами или оформляйте заказ онлайн — соберём к вашему
-                приходу.
+                Приходите сами за свежим привозом — или закажите заранее, и мы
+                соберём к вашему приходу.
               </p>
               <dl className="visit-facts">
                 <div>
@@ -179,17 +196,31 @@ function App() {
                   <dd>{store.address}</dd>
                 </div>
                 <div>
-                  <dt>Метро</dt>
-                  <dd>{store.metro}</dd>
+                  <dt>Рядом</dt>
+                  <dd>{store.landmark}</dd>
                 </div>
                 <div>
                   <dt>Часы</dt>
                   <dd>{store.hours}</dd>
                 </div>
+                <div>
+                  <dt>Отзывы</dt>
+                  <dd>{store.rating}</dd>
+                </div>
               </dl>
-              <a className="btn btn-primary" href={store.phoneHref}>
-                {store.phoneDisplay}
-              </a>
+              <div className="visit-actions">
+                <a className="btn btn-primary" href={store.phoneHref}>
+                  {store.phoneDisplay}
+                </a>
+                <a
+                  className="btn btn-secondary"
+                  href={store.mapsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Открыть на карте
+                </a>
+              </div>
             </div>
             <motion.div
               className="visit-visual"
@@ -199,8 +230,8 @@ function App() {
               transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             >
               <img
-                src="https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=1400&q=80"
-                alt="Интерьер продуктового магазина"
+                src="https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=1400&q=80"
+                alt="Яркие фрукты на витрине"
                 loading="lazy"
               />
             </motion.div>
@@ -210,9 +241,11 @@ function App() {
 
       <footer className="footer">
         <div className="footer-brand">{store.brand}</div>
-        <p>Продукты у дома · Москва · Онлайн-заказы</p>
+        <p>Фрукты и овощи · Черноголовка · {store.telegramLabel}</p>
         <div className="footer-links">
-          <a href="#dostavka">Доставка</a>
+          <a href={store.telegram} target="_blank" rel="noreferrer">
+            Telegram
+          </a>
           <a href="#magazin">Контакты</a>
           <a href={store.phoneHref}>Телефон</a>
         </div>
