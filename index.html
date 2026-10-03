@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#071018">
+  <meta name="description" content="Эрудит — живой зал вопросов на эрудицию: шесть тем, таймер, серии и короткое объяснение после каждого ответа.">
+  <title>Эрудит — вопросы на эрудицию</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,600;0,7..72,700;1,7..72,560&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>html { background: #071018; }</style>
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true">
+    <span class="orb orb-a"></span>
+    <span class="orb orb-b"></span>
+    <span class="orb orb-c"></span>
+  </div>
+  <canvas id="sky" aria-hidden="true"></canvas>
+  <canvas id="fx" aria-hidden="true"></canvas>
+  <div id="app"></div>
+  <noscript>
+    <p class="noscript">Эрудиту нужен JavaScript, чтобы открыть залы и считать очки.</p>
+  </noscript>
+  <script defer src="js/questions.js"></script>
+  <script defer src="js/app.js"></script>
+</body>
+</html>
