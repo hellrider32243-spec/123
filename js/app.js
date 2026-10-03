@@ -224,7 +224,7 @@ function optionView(text, index, extra) {
   return `
     <button class="option" type="button" data-action="pick" data-index="${index}" ${extra || ""}>
       <span class="letter">${LETTERS[index]}</span>
-      <span>${esc(text)}</span>
+      <span class="option-text">${esc(text)}</span>
     </button>
   `;
 }
@@ -633,6 +633,10 @@ function useHint() {
     if (state.hidden.has(Number(btn.dataset.index))) {
       btn.classList.add("is-out");
       btn.disabled = true;
+      const label = document.createElement("em");
+      label.className = "out-label";
+      label.textContent = "убрано";
+      btn.appendChild(label);
     }
   });
   const hint = document.getElementById("hint");

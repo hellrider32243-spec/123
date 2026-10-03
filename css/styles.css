@@ -566,13 +566,27 @@ h1 em {
 .option.is-wrong .letter { background: #d4543c; color: white; }
 .option.is-dim { opacity: 0.42; }
 .option.is-out {
-  opacity: 0.4;
-  background: rgba(28, 25, 20, 0.04);
+  background: #efe8dc;
   border-style: dashed;
+  border-color: rgba(157, 47, 34, 0.35);
+  color: rgba(28, 25, 20, 0.45);
   pointer-events: none;
 }
 .option.is-out .letter,
-.option.is-out span { text-decoration: line-through; }
+.option.is-out .option-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: #9d2f22;
+}
+.out-label {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9d2f22;
+}
 
 .score-note { margin: 14px 0 0; color: rgba(28, 25, 20, 0.58); font-size: 0.92rem; }
 
