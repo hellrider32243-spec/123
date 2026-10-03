@@ -23,6 +23,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body { margin: 0; padding: 0; }
 
 html { scroll-behavior: smooth; }
@@ -144,8 +146,10 @@ svg { display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 0 12px;
-  background: linear-gradient(#071018 62%, rgba(7, 16, 24, 0));
+  padding: 18px 0 14px;
+  background: rgba(7, 16, 24, 0.94);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 1px 0 rgba(244, 239, 230, 0.06);
 }
 
 .logo {
@@ -421,7 +425,7 @@ h1 em {
 
 .quiz-sticky {
   position: sticky;
-  top: 68px;
+  top: 76px;
   z-index: 4;
   padding-bottom: 10px;
   background: linear-gradient(#071018, rgba(7, 16, 24, 0.94) 72%, transparent);
@@ -560,8 +564,15 @@ h1 em {
 }
 
 .option.is-wrong .letter { background: #d4543c; color: white; }
-.option.is-dim { opacity: 0.48; }
-.option.is-out { opacity: 0.32; text-decoration: line-through; pointer-events: none; }
+.option.is-dim { opacity: 0.42; }
+.option.is-out {
+  opacity: 0.4;
+  background: rgba(28, 25, 20, 0.04);
+  border-style: dashed;
+  pointer-events: none;
+}
+.option.is-out .letter,
+.option.is-out span { text-decoration: line-through; }
 
 .score-note { margin: 14px 0 0; color: rgba(28, 25, 20, 0.58); font-size: 0.92rem; }
 
@@ -726,7 +737,8 @@ main { animation: rise 0.45s ease both; }
   .actions .btn, .sheet-foot .btn, .result-actions .btn { width: 100%; }
   .result-actions, .sheet-foot { flex-direction: column; }
   .keys { display: none; }
-  .quiz-top { align-items: flex-start; }
+  .quiz-top { align-items: flex-start; flex-wrap: wrap; }
+  .hud { flex-wrap: wrap; }
   .section-head { flex-direction: column; align-items: flex-start; }
 }
 

@@ -156,6 +156,13 @@ function modeTitle() {
   return categoryById(state.category)?.title || "Зал";
 }
 
+function finishedPhrase() {
+  const title = modeTitle();
+  const feminine = ["История", "Наука", "География", "Литература", "Природа"].includes(title);
+  const verb = title === "Искусство" ? "завершено" : feminine ? "завершена" : "завершён";
+  return `${title} ${verb}`;
+}
+
 function modeKey() {
   if (state.mode === "hall") return state.category;
   return state.mode;
@@ -371,7 +378,7 @@ function resultScreen() {
   const best = bestOf(modeKey());
   return `
     <section class="result-screen">
-      <p class="eyebrow">${esc(modeTitle())} завершён</p>
+      <p class="eyebrow">${esc(finishedPhrase())}</p>
       <div class="ring-wrap">
         <div class="ring" id="ring">
           <div class="ring-hole">
@@ -549,6 +556,8 @@ function reveal(picked, ok, timedOut) {
   verdict.classList.toggle("bad", !ok);
   document.getElementById("explain").hidden = false;
   document.getElementById("next-wrap").hidden = false;
+  const note = document.querySelector(".score-note");
+  if (note) note.hidden = true;
   setProgress(true);
   paintHud();
   const status = document.getElementById("status");
